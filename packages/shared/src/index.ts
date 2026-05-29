@@ -4,6 +4,7 @@ export interface NoteMeta {
   title: string;
   updatedAt: string; // ISO 8601
   createdAt: string;
+  projectId: string;
 }
 
 export interface Note extends NoteMeta {
@@ -19,4 +20,38 @@ export interface TokenClaims {
 export interface LinkEdge {
   sourceId: string;
   targetId: string;
+}
+
+export type ProjectRole = 'owner' | 'admin' | 'editor' | 'viewer'
+
+export interface Project {
+  id: string
+  name: string
+  slug: string
+  description: string
+  isPublic: boolean
+  ownerId: string
+  createdAt: string
+  updatedAt: string
+  role?: ProjectRole  // the requesting user's role (undefined if not a member)
+}
+
+export interface ProjectMember {
+  projectId: string
+  userId: string
+  userName: string
+  role: ProjectRole
+  joinedAt: string
+}
+
+export interface InviteInfo {
+  id: string
+  projectId: string
+  projectName: string
+  role: ProjectRole
+  token: string
+  createdAt: string
+  expiresAt?: string
+  maxUses?: number
+  useCount: number
 }
