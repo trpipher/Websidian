@@ -1,0 +1,25 @@
+{
+  "name": "@websidian/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=../../.env src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hocuspocus/provider": "^2.15.0",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@websidian/shared": "workspace:*",
+    "ws": "^8.18.0",
+    "yjs": "^13.6.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.0",
+    "tsx": "^4.22.0"
+  }
+}
