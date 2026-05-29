@@ -8,6 +8,7 @@ export interface SortConfig {
   direction: SortDirection
 }
 
+// onClose must be stable (useCallback) to prevent effect re-attachment on every render
 interface Props {
   config: SortConfig
   anchorRect: DOMRect
@@ -56,6 +57,8 @@ export default function SortMenu({ config, anchorRect, onChange, onClose }: Prop
   return (
     <div
       ref={ref}
+      role="menu"
+      aria-label="Sort by"
       style={{
         position: 'fixed',
         top,
@@ -65,7 +68,7 @@ export default function SortMenu({ config, anchorRect, onChange, onClose }: Prop
         border: '1px solid #313244',
         borderRadius: 6,
         padding: '8px 0',
-        minWidth: 160,
+        minWidth: 180,
         boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
       }}
     >
@@ -77,6 +80,8 @@ export default function SortMenu({ config, anchorRect, onChange, onClose }: Prop
         return (
           <button
             key={field}
+            role="menuitemradio"
+            aria-checked={isSelected}
             onClick={() => handleSelect(field)}
             style={{
               display: 'flex',
@@ -97,7 +102,7 @@ export default function SortMenu({ config, anchorRect, onChange, onClose }: Prop
             </span>
             <span style={{ flex: 1 }}>{label}</span>
             {isSelected && (
-              <span style={{ color: '#6c7086', fontSize: 11 }}>
+              <span aria-hidden="true" style={{ color: '#6c7086', fontSize: 11 }}>
                 {config.direction === 'asc' ? '↑' : '↓'}
               </span>
             )}
