@@ -6,7 +6,12 @@ import { notesRouter } from './routes/notes.js'
 import { authRouter } from './routes/auth.js'
 
 const app = new Hono()
-app.use('*', cors({ origin: '*' }))
+app.use('*', cors({
+  origin: (origin) => origin ?? '*',
+  allowHeaders: ['Content-Type', 'Authorization'],
+  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  credentials: true,
+}))
 app.route('/api/notes', notesRouter)
 app.route('/api/auth', authRouter)
 

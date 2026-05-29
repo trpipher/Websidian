@@ -9,6 +9,7 @@ export const auth = betterAuth({
   database: sqliteDb as any,
   secret: process.env.BETTER_AUTH_SECRET ?? 'dev-secret',
   baseURL: process.env.BETTER_AUTH_URL ?? 'http://localhost:1235',
+  trustedOrigins: (process.env.TRUSTED_ORIGINS ?? 'http://localhost:3000').split(','),
   emailAndPassword: { enabled: true },
   socialProviders: process.env.GITHUB_CLIENT_ID
     ? {
