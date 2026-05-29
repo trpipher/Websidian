@@ -64,20 +64,17 @@ export function useNotes(projectId: string | null, token: string | null) {
   const moveNote = useCallback(async (
     id: string,
     parentId: string | null,
-    sortOrder: number,
   ) => {
     if (!projectId || !token) return
-    // Optimistic update
     setNotes(prev => prev.map(n =>
-      n.id === id ? { ...n, parentId, sortOrder } : n
+      n.id === id ? { ...n, parentId } : n
     ))
     const res = await fetch(`${API}/api/projects/${projectId}/notes/${id}`, {
       method: 'PATCH',
       headers: authHeaders(),
-      body: JSON.stringify({ parentId, sortOrder }),
+      body: JSON.stringify({ parentId }),
     })
     if (!res.ok) {
-      // Revert on failure
       await refresh()
     }
   }, [projectId, token, authHeaders, refresh])
