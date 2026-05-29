@@ -185,7 +185,7 @@ export default function App() {
         <ProjectSwitcher
           projects={projects}
           activeProject={activeProject}
-          onSelect={p => { setActiveProject(p); setActiveId(null) }}
+          onSelect={p => { setActiveProject(p); setActiveId(null); setPreviewMode(true) }}
           onCreate={createProject}
         />
 

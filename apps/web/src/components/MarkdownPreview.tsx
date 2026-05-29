@@ -65,19 +65,23 @@ export default function MarkdownPreview({ yText, awareness: _awareness, onWikili
             const processed = processChildren(children, onWikilinkClick)
             return <p style={{ marginBottom: '1em' }}>{processed}</p>
           },
-          h1: ({ children }) => <h1 style={{ fontSize: '1.8em', fontWeight: 700, borderBottom: '1px solid #313244', paddingBottom: '0.3em', marginBottom: '0.8em', fontFamily: 'system-ui, sans-serif' }}>{children}</h1>,
-          h2: ({ children }) => <h2 style={{ fontSize: '1.4em', fontWeight: 700, marginBottom: '0.6em', fontFamily: 'system-ui, sans-serif' }}>{children}</h2>,
-          h3: ({ children }) => <h3 style={{ fontSize: '1.2em', fontWeight: 700, marginBottom: '0.5em', fontFamily: 'system-ui, sans-serif' }}>{children}</h3>,
-          code({ children, className }: { children?: React.ReactNode; className?: string }) {
-            const isBlock = Boolean(className)
-            return isBlock
-              ? <pre style={{ background: '#181825', borderRadius: 6, padding: '12px 16px', overflowX: 'auto', fontSize: '0.88em', marginBottom: '1em' }}><code style={{ fontFamily: 'monospace' }}>{children}</code></pre>
-              : <code style={{ background: '#313244', borderRadius: 3, padding: '1px 5px', fontSize: '0.88em', fontFamily: 'monospace' }}>{children}</code>
-          },
+          h1: ({ children }) => <h1 style={{ fontSize: '1.8em', fontWeight: 700, borderBottom: '1px solid #313244', paddingBottom: '0.3em', marginBottom: '0.8em', fontFamily: 'system-ui, sans-serif' }}>{processChildren(children, onWikilinkClick)}</h1>,
+          h2: ({ children }) => <h2 style={{ fontSize: '1.4em', fontWeight: 700, marginBottom: '0.6em', fontFamily: 'system-ui, sans-serif' }}>{processChildren(children, onWikilinkClick)}</h2>,
+          h3: ({ children }) => <h3 style={{ fontSize: '1.2em', fontWeight: 700, marginBottom: '0.5em', fontFamily: 'system-ui, sans-serif' }}>{processChildren(children, onWikilinkClick)}</h3>,
+          pre: ({ children }) => (
+            <pre style={{ background: '#181825', borderRadius: 6, padding: '12px 16px', overflowX: 'auto', fontSize: '0.88em', marginBottom: '1em', fontFamily: 'monospace' }}>
+              {children}
+            </pre>
+          ),
+          code: ({ children }) => (
+            <code style={{ background: '#313244', borderRadius: 3, padding: '1px 5px', fontSize: '0.88em', fontFamily: 'monospace' }}>
+              {children}
+            </code>
+          ),
           blockquote: ({ children }) => <blockquote style={{ borderLeft: '3px solid #45475a', paddingLeft: 16, color: '#6c7086', margin: '0 0 1em 0' }}>{children}</blockquote>,
           ul: ({ children }) => <ul style={{ paddingLeft: 24, marginBottom: '1em' }}>{children}</ul>,
           ol: ({ children }) => <ol style={{ paddingLeft: 24, marginBottom: '1em' }}>{children}</ol>,
-          li: ({ children }) => <li style={{ marginBottom: '0.25em' }}>{children}</li>,
+          li: ({ children }) => <li style={{ marginBottom: '0.25em' }}>{processChildren(children, onWikilinkClick)}</li>,
           a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer" style={{ color: '#89b4fa' }}>{children}</a>,
           hr: () => <hr style={{ border: 'none', borderTop: '1px solid #313244', margin: '1.5em 0' }} />,
           table: ({ children }) => <table style={{ borderCollapse: 'collapse', marginBottom: '1em', width: '100%' }}>{children}</table>,
