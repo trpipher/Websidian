@@ -1,8 +1,13 @@
 import { Server } from '@hocuspocus/server'
 import { fetchDocument, storeDocument } from './persistence.js'
+import { onAuthenticate } from './auth-hook.js'
 
 export const hocuspocus = Server.configure({
   port: 1234,
+
+  async onAuthenticate(data) {
+    return onAuthenticate(data)
+  },
 
   async onLoadDocument({ document, documentName }) {
     const stored = fetchDocument(documentName)
