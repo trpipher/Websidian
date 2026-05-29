@@ -3,8 +3,13 @@ import Editor from './components/Editor'
 import Sidebar from './components/Sidebar'
 import PresenceBar from './components/PresenceBar'
 import LoginPage from './components/LoginPage'
+import ProjectSwitcher from './components/ProjectSwitcher'
+import ProjectSettings from './components/ProjectSettings'
 import { useProvider } from './hooks/useProvider'
 import { useNotes } from './hooks/useNotes'
+import { useProjects } from './hooks/useProjects'
+import { useProjectContext } from './contexts/ProjectContext'
+import type { Project } from '@websidian/shared'
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:1235'
 const USER_COLORS = ['#f38ba8', '#89b4fa', '#a6e3a1', '#fab387', '#cba6f7']
@@ -20,6 +25,7 @@ export default function App() {
   const [userImage, setUserImage] = useState<string | null>(
     () => sessionStorage.getItem('ws-image')
   )
+  const [showSettings, setShowSettings] = useState(false)
 
   const handleLogin = (token: string, name: string, image?: string | null) => {
     sessionStorage.setItem('ws-token', token)
@@ -39,7 +45,7 @@ export default function App() {
     setUserImage(null)
   }
 
-  // Handle OAuth callback: on mount check for an existing session (e.g. after Discord redirect)
+  // Handle OAuth callback: check for existing session after Discord redirect
   useEffect(() => {
     if (authToken) return
     fetch(`${API}/api/auth/get-session`, { credentials: 'include' })
@@ -52,10 +58,23 @@ export default function App() {
       .catch(() => {})
   }, [])
 
-  const { notes, createNote } = useNotes()
+  const { activeProject, setActiveProject, userRole } = useProjectContext()
+  const { projects, createProject } = useProjects(authToken)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const { notes, createNote } = useNotes(activeProject?.id ?? null, authToken)
   const { yText, synced, awareness } = useProvider(activeId, authToken)
 
+  // Auto-select first project on load
+  useEffect(() => {
+    if (!activeProject && projects.length > 0) setActiveProject(projects[0])
+  }, [projects, activeProject, setActiveProject])
+
+  // Reset active note when project changes
+  useEffect(() => {
+    setActiveId(null)
+  }, [activeProject?.id])
+
+  // Auto-select first note when notes load
   useEffect(() => {
     if (!activeId && notes.length > 0) setActiveId(notes[0].id)
   }, [notes, activeId])
@@ -64,6 +83,9 @@ export default function App() {
     if (!awareness) return
     awareness.setLocalStateField('user', { name: userName, color: USER_COLOR, image: userImage })
   }, [awareness, userName, userImage])
+
+  const canEdit = userRole === 'owner' || userRole === 'admin' || userRole === 'editor'
+  const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin'
 
   if (!authToken) {
     return <LoginPage onLogin={handleLogin} />
@@ -74,11 +96,30 @@ export default function App() {
       <header style={{
         height: 40, display: 'flex', alignItems: 'center',
         background: '#181825', borderBottom: '1px solid #313244',
-        padding: '0 12px', gap: 12,
+        padding: '0 12px', gap: 12, flexShrink: 0,
       }}>
-        <span style={{ color: '#cdd6f4', fontWeight: 700 }}>Websidian</span>
+        <span style={{ color: '#cdd6f4', fontWeight: 700, flexShrink: 0 }}>Websidian</span>
+
+        <ProjectSwitcher
+          projects={projects}
+          activeProject={activeProject}
+          onSelect={p => { setActiveProject(p); setActiveId(null) }}
+          onCreate={createProject}
+        />
+
+        {isOwnerOrAdmin && activeProject && (
+          <button
+            onClick={() => setShowSettings(true)}
+            style={{ background: 'none', border: 'none', color: '#6c7086', cursor: 'pointer', fontSize: 12, padding: '2px 4px' }}
+            title="Project settings"
+          >
+            ⚙
+          </button>
+        )}
+
         <PresenceBar awareness={awareness} />
         {!synced && activeId && <span style={{ color: '#6c7086', fontSize: 12 }}>syncing…</span>}
+
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           {userImage && (
             <img src={userImage} alt={userName} style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} />
@@ -92,20 +133,32 @@ export default function App() {
           </button>
         </div>
       </header>
+
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <Sidebar
           notes={notes}
           activeId={activeId}
           onSelect={setActiveId}
-          onNewNote={() => createNote(`Untitled-${Date.now()}`)}
+          onNewNote={canEdit ? () => createNote(`Untitled-${Date.now()}`) : undefined}
         />
-        {activeId && yText && <Editor yText={yText} awareness={awareness} />}
-        {!activeId && (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6c7086' }}>
-            Create or select a note
-          </div>
-        )}
+        {activeId && yText
+          ? <Editor yText={yText} awareness={awareness} />
+          : (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6c7086' }}>
+              {!activeProject ? 'Select or create a project' : notes.length === 0 ? 'Create your first note' : 'Select a note'}
+            </div>
+          )
+        }
       </div>
+
+      {showSettings && activeProject && authToken && (
+        <ProjectSettings
+          project={activeProject}
+          token={authToken}
+          onClose={() => setShowSettings(false)}
+          onUpdated={updates => setActiveProject({ ...activeProject, ...updates } as Project)}
+        />
+      )}
     </div>
   )
 }

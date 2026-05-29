@@ -4,7 +4,7 @@ interface Props {
   notes: NoteMeta[]
   activeId: string | null
   onSelect: (id: string) => void
-  onNewNote: () => void
+  onNewNote?: () => void
 }
 
 export default function Sidebar({ notes, activeId, onSelect, onNewNote }: Props) {
@@ -23,7 +23,7 @@ export default function Sidebar({ notes, activeId, onSelect, onNewNote }: Props)
       <div style={{ fontWeight: 700, marginBottom: 12, fontSize: 14 }}>
         Notes
       </div>
-      <button
+      {onNewNote && <button
         onClick={onNewNote}
         style={{
           width: '100%',
@@ -38,7 +38,7 @@ export default function Sidebar({ notes, activeId, onSelect, onNewNote }: Props)
         }}
       >
         + New Note
-      </button>
+      </button>}
       {notes.map((note) => (
         <div
           key={note.id}
