@@ -46,3 +46,24 @@ if (orphanCount > 0) {
   db.prepare('UPDATE notes SET project_id = ? WHERE project_id IS NULL').run(projectId)
   console.log(`[db] migrated ${orphanCount} orphan notes to project ${projectId}`)
 }
+
+// Add parent_id, sort_order, is_folder to notes if not present
+const noteCols = db.prepare("PRAGMA table_info(notes)").all() as { name: string }[]
+const noteColNames = new Set(noteCols.map(c => c.name))
+
+if (!noteColNames.has('parent_id')) {
+  db.exec('ALTER TABLE notes ADD COLUMN parent_id TEXT REFERENCES notes(id)')
+  console.log('[db] added parent_id column to notes')
+}
+if (!noteColNames.has('sort_order')) {
+  db.exec('ALTER TABLE notes ADD COLUMN sort_order REAL NOT NULL DEFAULT 0')
+  // Assign initial sort order based on rowid so existing notes keep a stable order
+  const rows = db.prepare('SELECT id, rowid FROM notes WHERE sort_order = 0').all() as { id: string; rowid: number }[]
+  const update = db.prepare('UPDATE notes SET sort_order = ? WHERE id = ?')
+  db.transaction(() => { for (const r of rows) update.run(r.rowid * 1000, r.id) })()
+  console.log(`[db] initialised sort_order for ${rows.length} notes`)
+}
+if (!noteColNames.has('is_folder')) {
+  db.exec('ALTER TABLE notes ADD COLUMN is_folder INTEGER NOT NULL DEFAULT 0')
+  console.log('[db] added is_folder column to notes')
+}

@@ -56,6 +56,9 @@ CREATE TABLE IF NOT EXISTS notes (
   deleted_at TEXT
 );
 
+-- Note hierarchy and ordering sentinels (added via migration in db.ts)
+-- parent_id, sort_order, is_folder — see db.ts for ALTER TABLE migration
+
 CREATE TABLE IF NOT EXISTS yjs_documents (
   note_id TEXT PRIMARY KEY,
   data BLOB NOT NULL,
