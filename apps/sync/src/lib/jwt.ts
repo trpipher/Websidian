@@ -1,4 +1,4 @@
-import { createHmac, createHash } from 'node:crypto'
+import { createHmac, createHash, timingSafeEqual } from 'node:crypto'
 
 function b64urlEncode(buf: Buffer): string {
   return buf.toString('base64')
@@ -27,7 +27,9 @@ export function verifyJwt(token: string): Record<string, unknown> {
   if (parts.length !== 3) throw new Error('Malformed JWT')
   const [header, body, sig] = parts
   const expected = b64urlEncode(createHmac('sha256', secret()).update(`${header}.${body}`).digest())
-  if (sig !== expected) throw new Error('Invalid JWT signature')
+  if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+    throw new Error('Invalid JWT signature')
+  }
   const payload = JSON.parse(b64urlDecode(body).toString()) as Record<string, unknown>
   if (typeof payload.exp === 'number' && payload.exp < Math.floor(Date.now() / 1000)) {
     throw new Error('JWT expired')
