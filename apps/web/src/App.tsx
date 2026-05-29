@@ -43,6 +43,9 @@ export default function App() {
     setAuthToken(token)
     setUserName(name)
     setUserImage(image ?? null)
+    // After OAuth authorize redirect, resume the flow
+    const redirect = new URLSearchParams(window.location.search).get('redirect')
+    if (redirect) window.location.href = redirect
   }
 
   const handleLogout = () => {

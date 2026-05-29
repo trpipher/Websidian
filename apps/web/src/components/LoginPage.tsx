@@ -52,7 +52,12 @@ export default function LoginPage({ onLogin }: Props) {
       const res = await fetch(`${API}/api/auth/sign-in/social`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: 'discord', callbackURL: window.location.origin }),
+        body: JSON.stringify({
+          provider: 'discord',
+          callbackURL: window.location.href.includes('?redirect=')
+            ? window.location.href
+            : window.location.origin,
+        }),
         credentials: 'include',
       })
       const data = await res.json()
