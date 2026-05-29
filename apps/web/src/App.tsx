@@ -42,7 +42,7 @@ export default function App() {
       </header>
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <Sidebar notes={HARDCODED_NOTES} activeId={activeId} onSelect={setActiveId} />
-        {yText && <Editor yText={yText} />}
+        {yText && <Editor yText={yText} awareness={awareness} />}
       </div>
     </div>
   )

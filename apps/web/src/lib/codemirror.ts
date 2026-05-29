@@ -3,14 +3,15 @@ import { languages } from '@codemirror/language-data'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { EditorView, lineNumbers, highlightActiveLine, keymap } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
-import { history, defaultKeymap, historyKeymap } from '@codemirror/commands'
+import { defaultKeymap } from '@codemirror/commands'
 
+// history() intentionally omitted — Yjs UndoManager handles undo/redo
 export function buildExtensions() {
   return [
     lineNumbers(),
     highlightActiveLine(),
-    history(),
-    keymap.of([...defaultKeymap, ...historyKeymap]),
+    keymap.of([...defaultKeymap]),
+    EditorView.theme({ '.cm-scroller': { paddingTop: '6px' } }),
     markdown({ base: markdownLanguage, codeLanguages: languages }),
     oneDark,
     EditorView.lineWrapping,
