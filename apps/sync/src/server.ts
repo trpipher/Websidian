@@ -7,5 +7,6 @@ const server = Server.configure({
   },
 })
 
-server.listen()
-console.log('Hocuspocus listening on ws://localhost:1234')
+server.listen().then(() => {
+  console.log('Hocuspocus listening on ws://localhost:1234')
+})
