@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import { db } from '../db.js'
+import { verifyJwt } from '../lib/jwt.js'
 import type { ProjectRole } from '@websidian/shared'
 
 const ROLE_RANK: Record<ProjectRole, number> = {
@@ -31,10 +32,18 @@ export function resolveUserId(c: Context): string | null {
   if (!token) return null
   // AI bot service token bypass
   if (token === (process.env.AI_BOT_TOKEN ?? 'dev-ai-bot-token')) return 'ai-bot'
+  // Session table lookup (Better Auth session tokens from web app)
   const row = db.prepare(
     'SELECT userId FROM session WHERE token = ? AND expiresAt > ?'
   ).get(token, new Date().toISOString()) as { userId: string } | undefined
-  return row?.userId ?? null
+  if (row?.userId) return row.userId
+  // JWT fallback (OAuth 2.1 access tokens issued to MCP server)
+  try {
+    const payload = verifyJwt(token)
+    return typeof payload.sub === 'string' ? payload.sub : null
+  } catch {
+    return null
+  }
 }
 
 /**
