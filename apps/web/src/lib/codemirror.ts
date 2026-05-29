@@ -1,23 +1,19 @@
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { oneDark } from '@codemirror/theme-one-dark'
-import { EditorView, lineNumbers, highlightActiveLine } from '@codemirror/view'
+import { EditorView, lineNumbers, highlightActiveLine, keymap } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
-import { history } from '@codemirror/commands'
-import { type Awareness } from 'y-protocols/awareness'
-import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next'
-import * as Y from 'yjs'
+import { history, defaultKeymap, historyKeymap } from '@codemirror/commands'
 
-export function buildExtensions(yText: Y.Text, awareness: Awareness | null, undoManager: Y.UndoManager) {
+export function buildExtensions() {
   return [
     lineNumbers(),
     highlightActiveLine(),
     history(),
+    keymap.of([...defaultKeymap, ...historyKeymap]),
     markdown({ base: markdownLanguage, codeLanguages: languages }),
     oneDark,
     EditorView.lineWrapping,
     EditorState.allowMultipleSelections.of(true),
-    yCollab(yText, awareness, { undoManager }),
-    yUndoManagerKeymap,
-  ].flat() as any
+  ]
 }

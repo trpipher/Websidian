@@ -1,38 +1,52 @@
 import { useEffect, useRef } from 'react'
 import { EditorView } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
-import { type Awareness } from 'y-protocols/awareness'
 import * as Y from 'yjs'
 import { buildExtensions } from '../lib/codemirror'
 
 interface Props {
   yText: Y.Text
-  awareness: Awareness | null
 }
 
-export default function Editor({ yText, awareness }: Props) {
+export default function Editor({ yText }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
 
   useEffect(() => {
     if (!containerRef.current) return
 
-    const undoManager = new Y.UndoManager(yText)
-
-    const extensions = buildExtensions(yText, awareness, undoManager)
-    const state = EditorState.create({
-      extensions,
+    const view = new EditorView({
+      doc: yText.toString(),
+      extensions: [
+        ...buildExtensions(),
+        EditorView.updateListener.of((update) => {
+          if (!update.docChanged) return
+          const newContent = update.state.doc.toString()
+          if (newContent === yText.toString()) return
+          yText.doc?.transact(() => {
+            yText.delete(0, yText.length)
+            yText.insert(0, newContent)
+          }, 'cm-update')
+        }),
+      ],
+      parent: containerRef.current,
     })
-
-    const view = new EditorView({ state, parent: containerRef.current })
     viewRef.current = view
+
+    const observer = () => {
+      const ycontent = yText.toString()
+      const cmcontent = view.state.doc.toString()
+      if (ycontent !== cmcontent) {
+        view.dispatch({ changes: { from: 0, to: cmcontent.length, insert: ycontent } })
+      }
+    }
+    yText.observe(observer)
 
     return () => {
       view.destroy()
       viewRef.current = null
-      undoManager.destroy()
+      yText.unobserve(observer)
     }
-  }, [yText, awareness])
+  }, [yText])
 
   return (
     <div
