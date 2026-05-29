@@ -129,10 +129,12 @@ CREATE TABLE IF NOT EXISTS oauth_clients (
 -- OAuth 2.1 PKCE authorization codes (single-use, 5-min TTL)
 CREATE TABLE IF NOT EXISTS oauth_codes (
   code             TEXT PRIMARY KEY,
-  client_id        TEXT NOT NULL,
-  user_id          TEXT NOT NULL,
+  client_id        TEXT NOT NULL REFERENCES oauth_clients(client_id) ON DELETE CASCADE,
+  user_id          TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
   redirect_uri     TEXT NOT NULL,
   code_challenge   TEXT NOT NULL,
   expires_at       TEXT NOT NULL,
   used             INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE INDEX IF NOT EXISTS idx_oauth_codes_client_id ON oauth_codes(client_id);
