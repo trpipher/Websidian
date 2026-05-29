@@ -36,7 +36,8 @@ export default function LoginPage({ onLogin }: Props) {
       }
 
       const data = await res.json()
-      const token = data.token ?? data.session?.token ?? ''
+      const token = data.token ?? data.session?.token
+      if (!token) { setError('Auth succeeded but no token received'); return }
       const userName = data.user?.name ?? email
       onLogin(token, userName)
     } catch (e) {
