@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { EditorView } from '@codemirror/view'
+import { EditorState } from '@codemirror/state'
 import { type Awareness } from 'y-protocols/awareness'
 import { keymap } from '@codemirror/view'
 import * as Y from 'yjs'
@@ -21,12 +22,17 @@ export default function Editor({ yText, awareness, onWikilinkClick }: Props) {
 
     const undoManager = new Y.UndoManager(yText)
 
+    // Initialise CodeMirror with the current Yjs content so yCollab doesn't
+    // see an empty document and push a delete-everything op back to the Yjs doc.
     const view = new EditorView({
-      extensions: [
-        ...buildExtensions(onWikilinkClick),
-        yCollab(yText, awareness, { undoManager }),
-        keymap.of(yUndoManagerKeymap),
-      ],
+      state: EditorState.create({
+        doc: yText.toString(),
+        extensions: [
+          ...buildExtensions(onWikilinkClick),
+          yCollab(yText, awareness, { undoManager }),
+          keymap.of(yUndoManagerKeymap),
+        ],
+      }),
       parent: containerRef.current,
     })
     viewRef.current = view
