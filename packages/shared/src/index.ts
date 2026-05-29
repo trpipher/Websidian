@@ -5,6 +5,9 @@ export interface NoteMeta {
   updatedAt: string; // ISO 8601
   createdAt: string;
   projectId: string;
+  parentId: string | null;
+  sortOrder: number;
+  isFolder: boolean;
 }
 
 export interface Note extends NoteMeta {
