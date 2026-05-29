@@ -12,7 +12,7 @@ const USER_COLOR = USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)]
 export default function App() {
   const { notes, createNote } = useNotes()
   const [activeId, setActiveId] = useState<string | null>(null)
-  const { yText, synced, awareness } = useProvider(activeId ?? 'no-note')
+  const { yText, synced, awareness } = useProvider(activeId)
 
   useEffect(() => {
     if (!activeId && notes.length > 0) setActiveId(notes[0].id)

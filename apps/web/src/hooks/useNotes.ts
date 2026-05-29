@@ -11,7 +11,11 @@ export function useNotes() {
     setNotes(await res.json())
   }, [])
 
-  useEffect(() => { refresh() }, [refresh])
+  useEffect(() => {
+    refresh()
+    const id = setInterval(refresh, 3000)
+    return () => clearInterval(id)
+  }, [refresh])
 
   const createNote = useCallback(async (title: string) => {
     await fetch(`${API}/api/notes`, {

@@ -5,7 +5,7 @@ import * as Y from 'yjs'
 
 const SYNC_URL = import.meta.env.VITE_SYNC_URL ?? 'ws://localhost:1234'
 
-export function useProvider(noteId: string) {
+export function useProvider(noteId: string | null) {
   const providerRef = useRef<HocuspocusProvider | null>(null)
   const docRef = useRef<Y.Doc | null>(null)
   const [yText, setYText] = useState<Y.Text | null>(null)
@@ -14,6 +14,12 @@ export function useProvider(noteId: string) {
   useEffect(() => {
     providerRef.current?.destroy()
     docRef.current?.destroy()
+    providerRef.current = null
+    docRef.current = null
+    setYText(null)
+    setSynced(false)
+
+    if (!noteId) return
 
     const doc = new Y.Doc()
     docRef.current = doc
@@ -26,7 +32,6 @@ export function useProvider(noteId: string) {
     })
     providerRef.current = provider
     setYText(doc.getText('content'))
-    setSynced(false)
 
     return () => {
       provider.destroy()
