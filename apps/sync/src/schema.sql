@@ -117,3 +117,22 @@ CREATE TABLE IF NOT EXISTS invite_links (
   max_uses INTEGER,
   use_count INTEGER NOT NULL DEFAULT 0
 );
+
+-- OAuth 2.1 dynamic client registrations
+CREATE TABLE IF NOT EXISTS oauth_clients (
+  client_id    TEXT PRIMARY KEY,
+  client_name  TEXT NOT NULL DEFAULT '',
+  redirect_uris TEXT NOT NULL,  -- JSON array of strings
+  created_at   TEXT NOT NULL
+);
+
+-- OAuth 2.1 PKCE authorization codes (single-use, 5-min TTL)
+CREATE TABLE IF NOT EXISTS oauth_codes (
+  code             TEXT PRIMARY KEY,
+  client_id        TEXT NOT NULL,
+  user_id          TEXT NOT NULL,
+  redirect_uri     TEXT NOT NULL,
+  code_challenge   TEXT NOT NULL,
+  expires_at       TEXT NOT NULL,
+  used             INTEGER NOT NULL DEFAULT 0
+);
