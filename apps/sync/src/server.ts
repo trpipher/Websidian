@@ -1,12 +1,4 @@
-import { Server } from '@hocuspocus/server'
+import { hocuspocus } from './hocuspocus.js'
 
-const server = Server.configure({
-  port: 1234,
-  async onConnect() {
-    console.log('client connected')
-  },
-})
-
-server.listen().then(() => {
-  console.log('Hocuspocus listening on ws://localhost:1234')
-})
+hocuspocus.listen()
+console.log('Hocuspocus listening on ws://localhost:1234')
