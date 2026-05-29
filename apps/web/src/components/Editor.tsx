@@ -23,7 +23,7 @@ export default function Editor({ yText, awareness }: Props) {
     const view = new EditorView({
       extensions: [
         ...buildExtensions(),
-        ...yCollab(yText, awareness, { undoManager }),
+        yCollab(yText, awareness, { undoManager }),
         keymap.of(yUndoManagerKeymap),
       ],
       parent: containerRef.current,

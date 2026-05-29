@@ -4,9 +4,10 @@ interface Props {
   notes: NoteMeta[]
   activeId: string | null
   onSelect: (id: string) => void
+  onNewNote: () => void
 }
 
-export default function Sidebar({ notes, activeId, onSelect }: Props) {
+export default function Sidebar({ notes, activeId, onSelect, onNewNote }: Props) {
   return (
     <aside
       style={{
@@ -22,6 +23,22 @@ export default function Sidebar({ notes, activeId, onSelect }: Props) {
       <div style={{ fontWeight: 700, marginBottom: 12, fontSize: 14 }}>
         Notes
       </div>
+      <button
+        onClick={onNewNote}
+        style={{
+          width: '100%',
+          marginBottom: 8,
+          padding: '4px 8px',
+          background: '#313244',
+          color: '#cdd6f4',
+          border: 'none',
+          borderRadius: 4,
+          cursor: 'pointer',
+          fontSize: 12,
+        }}
+      >
+        + New Note
+      </button>
       {notes.map((note) => (
         <div
           key={note.id}
