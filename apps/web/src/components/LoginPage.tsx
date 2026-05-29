@@ -46,9 +46,26 @@ export default function LoginPage({ onLogin }: Props) {
     }
   }
 
-  const signInWithDiscord = () => {
-    const callbackURL = encodeURIComponent(window.location.origin)
-    window.location.href = `${API}/api/auth/sign-in/discord?callbackURL=${callbackURL}`
+  const signInWithDiscord = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`${API}/api/auth/sign-in/social`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'discord', callbackURL: window.location.origin }),
+        credentials: 'include',
+      })
+      const data = await res.json()
+      if (data?.url) {
+        window.location.href = data.url
+      } else {
+        setError('Discord sign-in failed — no redirect URL returned')
+        setLoading(false)
+      }
+    } catch {
+      setError('Network error — is the sync server running?')
+      setLoading(false)
+    }
   }
 
   const inputStyle: React.CSSProperties = {
