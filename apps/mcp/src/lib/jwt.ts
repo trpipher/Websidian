@@ -27,7 +27,9 @@ export function verifyJwt(token: string): JwtPayload {
   if (parts.length !== 3) throw new Error('Malformed JWT')
   const [header, body, sig] = parts
   const expected = b64urlEncode(createHmac('sha256', secret()).update(`${header}.${body}`).digest())
-  if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+  const sigBuf = Buffer.from(sig)
+  const expBuf = Buffer.from(expected)
+  if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
     throw new Error('Invalid JWT signature')
   }
   const payload = JSON.parse(b64urlDecode(body).toString()) as JwtPayload
