@@ -40,5 +40,8 @@ export function verifyJwt(token: string): Record<string, unknown> {
 /** Verify PKCE S256: SHA256(verifier) encoded as base64url must equal challenge */
 export function verifyPkce(codeVerifier: string, codeChallenge: string): boolean {
   const hash = createHash('sha256').update(codeVerifier).digest()
-  return b64urlEncode(hash) === codeChallenge
+  const computed = Buffer.from(b64urlEncode(hash))
+  const expected = Buffer.from(codeChallenge)
+  if (computed.length !== expected.length) return false
+  return timingSafeEqual(computed, expected)
 }

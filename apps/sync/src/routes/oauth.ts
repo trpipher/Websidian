@@ -18,6 +18,19 @@ oauthRouter.post('/register', async (c) => {
     return c.json({ error: 'invalid_client_metadata', error_description: 'redirect_uris required' }, 400)
   }
 
+  // Only allow http/https schemes — reject javascript:, file://, etc.
+  const invalidUri = body.redirect_uris.find(uri => {
+    try {
+      const parsed = new URL(uri)
+      return parsed.protocol !== 'http:' && parsed.protocol !== 'https:'
+    } catch {
+      return true // unparseable URI is invalid
+    }
+  })
+  if (invalidUri) {
+    return c.json({ error: 'invalid_client_metadata', error_description: 'redirect_uris must use http or https scheme' }, 400)
+  }
+
   const clientId = randomUUID()
   db.prepare(`
     INSERT INTO oauth_clients (client_id, client_name, redirect_uris, created_at)
@@ -55,29 +68,31 @@ oauthRouter.get('/authorize', async (c) => {
   ).get(client_id) as { redirect_uris: string } | undefined
 
   if (!client) return c.json({ error: 'invalid_client' }, 400)
-  const allowedUris = JSON.parse(client.redirect_uris) as string[]
+  let allowedUris: string[]
+  try {
+    allowedUris = JSON.parse(client.redirect_uris) as string[]
+  } catch {
+    return c.json({ error: 'invalid_client', error_description: 'malformed client registration' }, 400)
+  }
   if (!allowedUris.includes(redirect_uri)) {
     return c.json({ error: 'invalid_request', error_description: 'redirect_uri mismatch' }, 400)
   }
 
-  // Check Better Auth session cookie
-  const sessionToken = getCookie(c, 'better-auth.session_token')
-  if (!sessionToken) {
-    // No session — redirect to web app login, preserving all authorize params
-    const currentUrl = new URL(c.req.url)
-    const returnUrl = `${BETTER_AUTH_URL}/oauth/authorize${currentUrl.search}`
+  const loginRedirect = () => {
+    const qs = c.req.url.includes('?') ? c.req.url.slice(c.req.url.indexOf('?')) : ''
+    const returnUrl = `${BETTER_AUTH_URL}/oauth/authorize${qs}`
     return c.redirect(`${WEB_URL}?redirect=${encodeURIComponent(returnUrl)}`)
   }
+
+  // Check Better Auth session cookie
+  const sessionToken = getCookie(c, 'better-auth.session_token')
+  if (!sessionToken) return loginRedirect()
 
   const session = db.prepare(
     'SELECT userId FROM session WHERE token = ? AND expiresAt > ?'
   ).get(sessionToken, new Date().toISOString()) as { userId: string } | undefined
 
-  if (!session) {
-    const currentUrl = new URL(c.req.url)
-    const returnUrl = `${BETTER_AUTH_URL}/oauth/authorize${currentUrl.search}`
-    return c.redirect(`${WEB_URL}?redirect=${encodeURIComponent(returnUrl)}`)
-  }
+  if (!session) return loginRedirect()
 
   // Auto-approve: issue authorization code
   const code = randomUUID()
@@ -125,7 +140,8 @@ oauthRouter.post('/token', async (c) => {
     used: number
   } | undefined
 
-  if (!row || row.used) return c.json({ error: 'invalid_grant' }, 400)
+  if (!row) return c.json({ error: 'invalid_grant' }, 400)
+  if (row.used) return c.json({ error: 'invalid_grant', error_description: 'code already used' }, 400)
   if (new Date(row.expires_at) < new Date()) return c.json({ error: 'invalid_grant', error_description: 'code expired' }, 400)
   if (row.redirect_uri !== redirect_uri) return c.json({ error: 'invalid_grant', error_description: 'redirect_uri mismatch' }, 400)
 
@@ -133,8 +149,11 @@ oauthRouter.post('/token', async (c) => {
     return c.json({ error: 'invalid_grant', error_description: 'code_verifier mismatch' }, 400)
   }
 
-  // Mark code used
-  db.prepare('UPDATE oauth_codes SET used = 1 WHERE code = ?').run(code)
+  // Atomically mark the code used — if another request already claimed it, changes will be 0
+  const result = db.prepare('UPDATE oauth_codes SET used = 1 WHERE code = ? AND used = 0').run(code)
+  if (result.changes === 0) {
+    return c.json({ error: 'invalid_grant', error_description: 'code already used' }, 400)
+  }
 
   // Look up user name for token payload
   const user = db.prepare('SELECT name FROM "user" WHERE id = ?').get(row.user_id) as { name: string } | undefined
