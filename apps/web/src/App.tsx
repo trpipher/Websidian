@@ -126,7 +126,7 @@ export default function App() {
       .catch(() => {})
   }, [authToken, pendingInviteToken])
   const [activeId, setActiveId] = useState<string | null>(null)
-  const { notes, createNote } = useNotes(activeProject?.id ?? null, authToken)
+  const { notes, createNote, renameNote, deleteNote, moveNote } = useNotes(activeProject?.id ?? null, authToken)
   const { yText, synced, awareness } = useProvider(activeId, authToken)
 
   // Auto-select first project on load
@@ -241,8 +241,23 @@ export default function App() {
           <Sidebar
             notes={notes}
             activeId={activeId}
+            canEdit={canEdit}
             onSelect={setActiveId}
-            onNewNote={canEdit ? () => { createNote(`Untitled-${Date.now()}`); setPreviewMode(false) } : undefined}
+            onNewNote={(parentId) => {
+              if (!canEdit) return
+              createNote(`Untitled-${Date.now()}`, { parentId })
+              setPreviewMode(false)
+            }}
+            onNewFolder={(parentId) => {
+              if (!canEdit) return
+              createNote(`New Folder`, { parentId, isFolder: true })
+            }}
+            onRename={(id, title) => renameNote(id, title)}
+            onDelete={(id) => {
+              deleteNote(id)
+              if (activeId === id) setActiveId(null)
+            }}
+            onMove={(id, parentId, sortOrder) => moveNote(id, parentId, sortOrder)}
           />
           <BacklinksPanel
             noteId={activeId}
