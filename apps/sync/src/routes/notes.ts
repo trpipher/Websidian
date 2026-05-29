@@ -6,7 +6,7 @@ import { resolveUserId, canReadProject, requireProjectRole } from '../middleware
 
 export const notesRouter = new Hono()
 
-// GET / — list notes in project
+// ── List notes ────────────────────────────────────────────────────────────────
 notesRouter.get('/', async (c) => {
   const projectId = c.req.param('projectId')!
   const userId = resolveUserId(c)
@@ -14,28 +14,50 @@ notesRouter.get('/', async (c) => {
 
   const notes = db.prepare(`
     SELECT id, path, title, project_id as projectId,
-           created_at as createdAt, updated_at as updatedAt
+           created_at as createdAt, updated_at as updatedAt,
+           parent_id as parentId,
+           COALESCE(sort_order, rowid * 1000) as sortOrder,
+           COALESCE(is_folder, 0) as isFolder
     FROM notes
     WHERE project_id = ? AND deleted_at IS NULL
-    ORDER BY updated_at DESC
-  `).all(projectId) as NoteMeta[]
-  return c.json(notes)
+    ORDER BY COALESCE(sort_order, rowid * 1000) ASC
+  `).all(projectId) as (Omit<NoteMeta, 'isFolder'> & { isFolder: number })[]
+
+  return c.json(notes.map(n => ({ ...n, isFolder: Boolean(n.isFolder) })))
 })
 
-// POST / — create note (editor+)
+// ── Create note or folder ─────────────────────────────────────────────────────
 notesRouter.post('/', requireProjectRole('editor'), async (c) => {
   const projectId = c.req.param('projectId')
-  const { path, title } = await c.req.json<{ path: string; title: string }>()
+  const body = await c.req.json<{
+    path: string
+    title: string
+    parentId?: string | null
+    isFolder?: boolean
+  }>()
+  const { path, title, parentId = null, isFolder = false } = body
   const id = randomUUID()
   const now = new Date().toISOString()
+
+  // Compute sort_order: max within parent + 1000
+  const maxRow = db.prepare(`
+    SELECT MAX(COALESCE(sort_order, 0)) as m FROM notes
+    WHERE project_id = ? AND COALESCE(parent_id, '') = COALESCE(?, '') AND deleted_at IS NULL
+  `).get(projectId, parentId) as { m: number | null }
+  const sortOrder = (maxRow.m ?? 0) + 1000
+
   db.prepare(`
-    INSERT INTO notes (id, path, title, content, project_id, created_at, updated_at)
-    VALUES (?, ?, ?, '', ?, ?, ?)
-  `).run(id, path, title, projectId, now, now)
-  return c.json({ id, path, title, projectId, createdAt: now, updatedAt: now } as NoteMeta, 201)
+    INSERT INTO notes (id, path, title, content, project_id, parent_id, sort_order, is_folder, created_at, updated_at)
+    VALUES (?, ?, ?, '', ?, ?, ?, ?, ?, ?)
+  `).run(id, path, title, projectId, parentId, sortOrder, isFolder ? 1 : 0, now, now)
+
+  return c.json({
+    id, path, title, projectId, createdAt: now, updatedAt: now,
+    parentId, sortOrder, isFolder,
+  } as NoteMeta, 201)
 })
 
-// GET /search — FTS search within project
+// ── FTS search ────────────────────────────────────────────────────────────────
 notesRouter.get('/search', async (c) => {
   const projectId = c.req.param('projectId')!
   const userId = resolveUserId(c)
@@ -43,32 +65,83 @@ notesRouter.get('/search', async (c) => {
   const q = c.req.query('q') ?? ''
   const rows = db.prepare(`
     SELECT n.id, n.path, n.title, n.project_id as projectId,
-           n.created_at as createdAt, n.updated_at as updatedAt
+           n.created_at as createdAt, n.updated_at as updatedAt,
+           n.parent_id as parentId,
+           COALESCE(n.sort_order, n.rowid * 1000) as sortOrder,
+           COALESCE(n.is_folder, 0) as isFolder
     FROM notes_fts fts
     JOIN notes n ON n.rowid = fts.rowid
     WHERE notes_fts MATCH ? AND n.project_id = ? AND n.deleted_at IS NULL
     ORDER BY rank LIMIT 20
-  `).all(q, projectId)
-  return c.json(rows)
+  `).all(q, projectId) as (Omit<NoteMeta, 'isFolder'> & { isFolder: number })[]
+  return c.json(rows.map(n => ({ ...n, isFolder: Boolean(n.isFolder) })))
 })
 
-// PATCH /:id — rename note (editor+)
+// ── Update note (rename, move, reorder) ───────────────────────────────────────
 notesRouter.patch('/:id', requireProjectRole('editor'), async (c) => {
   const id = c.req.param('id')
-  const updates = await c.req.json<Partial<{ path: string; title: string }>>()
+  const updates = await c.req.json<Partial<{
+    title: string
+    path: string
+    parentId: string | null
+    sortOrder: number
+  }>>()
   const now = new Date().toISOString()
-  if (updates.title) db.prepare('UPDATE notes SET title = ?, updated_at = ? WHERE id = ?').run(updates.title, now, id)
-  if (updates.path) db.prepare('UPDATE notes SET path = ?, updated_at = ? WHERE id = ?').run(updates.path, now, id)
+
+  // Cycle check: if moving a folder, ensure the new parentId is not a descendant
+  if (updates.parentId !== undefined) {
+    const note = db.prepare('SELECT is_folder FROM notes WHERE id = ?').get(id) as { is_folder: number } | undefined
+    if (note?.is_folder) {
+      const isCycle = db.prepare(`
+        WITH RECURSIVE desc(id) AS (
+          SELECT id FROM notes WHERE id = ?
+          UNION ALL
+          SELECT n.id FROM notes n JOIN desc d ON n.parent_id = d.id WHERE n.deleted_at IS NULL
+        )
+        SELECT COUNT(*) as cnt FROM desc WHERE id = ?
+      `).get(id, updates.parentId) as { cnt: number }
+      if (isCycle.cnt > 0) return c.json({ error: 'Cannot move a folder into its own descendant' }, 400)
+    }
+  }
+
+  if (updates.title !== undefined)
+    db.prepare('UPDATE notes SET title = ?, updated_at = ? WHERE id = ?').run(updates.title, now, id)
+  if (updates.path !== undefined)
+    db.prepare('UPDATE notes SET path = ?, updated_at = ? WHERE id = ?').run(updates.path, now, id)
+  if (updates.parentId !== undefined || updates.sortOrder !== undefined) {
+    const fields: string[] = []
+    const vals: unknown[] = []
+    if (updates.parentId !== undefined) { fields.push('parent_id = ?'); vals.push(updates.parentId) }
+    if (updates.sortOrder !== undefined) { fields.push('sort_order = ?'); vals.push(updates.sortOrder) }
+    fields.push('updated_at = ?'); vals.push(now)
+    vals.push(id)
+    db.prepare(`UPDATE notes SET ${fields.join(', ')} WHERE id = ?`).run(...vals)
+  }
+
   return c.json({ ok: true })
 })
 
-// DELETE /:id — soft delete (admin+)
-notesRouter.delete('/:id', requireProjectRole('admin'), (c) => {
-  db.prepare('UPDATE notes SET deleted_at = ? WHERE id = ?').run(new Date().toISOString(), c.req.param('id'))
+// ── Delete note or folder (editor+, recursive for folders) ────────────────────
+notesRouter.delete('/:id', requireProjectRole('editor'), (c) => {
+  const id = c.req.param('id')
+  const now = new Date().toISOString()
+
+  // Recursively soft-delete all descendants then the note itself
+  db.transaction(() => {
+    db.prepare(`
+      WITH RECURSIVE desc(id) AS (
+        SELECT id FROM notes WHERE id = ?
+        UNION ALL
+        SELECT n.id FROM notes n JOIN desc d ON n.parent_id = d.id WHERE n.deleted_at IS NULL
+      )
+      UPDATE notes SET deleted_at = ? WHERE id IN (SELECT id FROM desc)
+    `).run(id, now)
+  })()
+
   return c.json({ ok: true })
 })
 
-// GET /:id/backlinks — notes that link to this note (reader access)
+// ── Backlinks ─────────────────────────────────────────────────────────────────
 notesRouter.get('/:id/backlinks', async (c) => {
   const projectId = c.req.param('projectId')!
   const userId = resolveUserId(c)
@@ -76,15 +149,18 @@ notesRouter.get('/:id/backlinks', async (c) => {
   const id = c.req.param('id')
   const links = db.prepare(`
     SELECT n.id, n.path, n.title, n.project_id as projectId,
-           n.created_at as createdAt, n.updated_at as updatedAt
+           n.created_at as createdAt, n.updated_at as updatedAt,
+           n.parent_id as parentId,
+           COALESCE(n.sort_order, n.rowid * 1000) as sortOrder,
+           COALESCE(n.is_folder, 0) as isFolder
     FROM note_links l
     JOIN notes n ON n.id = l.source_id
     WHERE l.target_id = ? AND n.deleted_at IS NULL
-  `).all(id) as NoteMeta[]
-  return c.json(links)
+  `).all(id) as (Omit<NoteMeta, 'isFolder'> & { isFolder: number })[]
+  return c.json(links.map(n => ({ ...n, isFolder: Boolean(n.isFolder) })))
 })
 
-// GET /graph — all wikilink edges in project (reader access)
+// ── Graph ─────────────────────────────────────────────────────────────────────
 notesRouter.get('/graph', async (c) => {
   const projectId = c.req.param('projectId')!
   const userId = resolveUserId(c)
