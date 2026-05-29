@@ -11,14 +11,14 @@ export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL ?? 'http://localhost:1235',
   trustedOrigins: (process.env.TRUSTED_ORIGINS ?? 'http://localhost:3000').split(','),
   emailAndPassword: { enabled: true },
-  socialProviders: process.env.GITHUB_CLIENT_ID
-    ? {
-        github: {
-          clientId: process.env.GITHUB_CLIENT_ID!,
-          clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-        },
-      }
-    : undefined,
+  socialProviders: {
+    ...(process.env.GITHUB_CLIENT_ID ? {
+      github: { clientId: process.env.GITHUB_CLIENT_ID!, clientSecret: process.env.GITHUB_CLIENT_SECRET! },
+    } : {}),
+    ...(process.env.DISCORD_CLIENT_ID ? {
+      discord: { clientId: process.env.DISCORD_CLIENT_ID!, clientSecret: process.env.DISCORD_CLIENT_SECRET! },
+    } : {}),
+  },
 })
 
 export const authRouter = new Hono()

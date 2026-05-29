@@ -1,4 +1,4 @@
-import { auth } from './routes/auth.js'
+import { db } from './db.js'
 
 const AI_BOT_TOKEN = process.env.AI_BOT_TOKEN ?? 'dev-ai-bot-token'
 
@@ -12,13 +12,11 @@ export async function onAuthenticate({
     return { userId: 'ai-bot', role: 'ai-bot' }
   }
 
-  const session = await auth.api.getSession({
-    headers: new Headers({ cookie: `better-auth.session_token=${token}` }),
-  })
+  const session = db.prepare(
+    'SELECT userId FROM session WHERE token = ? AND expiresAt > ?'
+  ).get(token, new Date().toISOString()) as { userId: string } | undefined
 
-  if (!session?.user) {
-    throw new Error('Unauthorized')
-  }
+  if (!session) throw new Error('Unauthorized')
 
-  return { userId: session.user.id, role: 'user' }
+  return { userId: session.userId, role: 'user' }
 }
