@@ -82,3 +82,38 @@ END;
 CREATE TRIGGER IF NOT EXISTS notes_ad AFTER DELETE ON notes BEGIN
   INSERT INTO notes_fts(notes_fts, rowid, title, content) VALUES ('delete', old.rowid, old.title, old.content);
 END;
+
+-- Projects
+CREATE TABLE IF NOT EXISTS projects (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  description TEXT NOT NULL DEFAULT '',
+  is_public INTEGER NOT NULL DEFAULT 0,
+  owner_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT
+);
+
+-- Project membership + roles
+CREATE TABLE IF NOT EXISTS project_members (
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  user_id TEXT NOT NULL,
+  role TEXT NOT NULL CHECK(role IN ('owner', 'admin', 'editor', 'viewer')),
+  joined_at TEXT NOT NULL,
+  PRIMARY KEY (project_id, user_id)
+);
+
+-- Invite links
+CREATE TABLE IF NOT EXISTS invite_links (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  role TEXT NOT NULL CHECK(role IN ('admin', 'editor', 'viewer')),
+  token TEXT NOT NULL UNIQUE,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  expires_at TEXT,
+  max_uses INTEGER,
+  use_count INTEGER NOT NULL DEFAULT 0
+);
