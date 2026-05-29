@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { createServer } from 'node:http'
+import { listProjects, listProjectsSchema } from './tools/list-projects.js'
 import { listNotes, listNotesSchema } from './tools/list-notes.js'
 import { searchNotes, searchNotesSchema } from './tools/search-notes.js'
 import { readNote, readNoteSchema } from './tools/read-note.js'
@@ -12,6 +13,13 @@ const PORT = parseInt(process.env.MCP_PORT ?? '3100')
 const MCP_BEARER = process.env.MCP_BEARER ?? 'dev-mcp-bearer'
 
 const mcpServer = new McpServer({ name: 'websidian', version: '0.1.0' })
+
+mcpServer.registerTool('list_projects', {
+  description: 'List all projects the authenticated user has access to. Call this first to discover project IDs.',
+  inputSchema: listProjectsSchema,
+}, async () => ({
+  content: [{ type: 'text', text: await listProjects() }],
+}))
 
 mcpServer.registerTool('list_notes', {
   description: 'List all notes in a project',
