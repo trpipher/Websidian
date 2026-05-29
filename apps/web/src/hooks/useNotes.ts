@@ -43,7 +43,7 @@ export function useNotes(projectId: string | null, token: string | null) {
   }, [projectId, token, authHeaders, refresh])
 
   const renameNote = useCallback(async (id: string, title: string) => {
-    if (!token) return
+    if (!projectId || !token) return
     await fetch(`${API}/api/projects/${projectId}/notes/${id}`, {
       method: 'PATCH',
       headers: authHeaders(),
@@ -53,7 +53,7 @@ export function useNotes(projectId: string | null, token: string | null) {
   }, [projectId, token, authHeaders, refresh])
 
   const deleteNote = useCallback(async (id: string) => {
-    if (!token) return
+    if (!projectId || !token) return
     await fetch(`${API}/api/projects/${projectId}/notes/${id}`, {
       method: 'DELETE',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -66,7 +66,7 @@ export function useNotes(projectId: string | null, token: string | null) {
     parentId: string | null,
     sortOrder: number,
   ) => {
-    if (!token) return
+    if (!projectId || !token) return
     // Optimistic update
     setNotes(prev => prev.map(n =>
       n.id === id ? { ...n, parentId, sortOrder } : n
