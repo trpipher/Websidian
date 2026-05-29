@@ -143,7 +143,6 @@ export default function SidebarItem({
               fontSize: 14,
               padding: '0 2px',
               flexShrink: 0,
-              opacity: 0,
             }}
             className="drag-handle"
           >

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -70,7 +70,7 @@ export default function Sidebar({
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [overFolderId, setOverFolderId] = useState<string | null>(null)
-  const [overFolderTimer, setOverFolderTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
+  const overFolderTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Auto-expand ancestors of the active note
   useEffect(() => {
@@ -111,14 +111,14 @@ export default function Sidebar({
     if (!over) { setOverFolderId(null); return }
     const overNote = notes.find(n => n.id === over.id)
     if (overNote?.isFolder && over.id !== overFolderId) {
-      if (overFolderTimer) clearTimeout(overFolderTimer)
-      const t = setTimeout(() => {
+      if (overFolderTimer.current) clearTimeout(overFolderTimer.current)
+      overFolderTimer.current = setTimeout(() => {
         setOverFolderId(over.id as string)
         setExpanded(prev => new Set([...prev, over.id as string]))
       }, 600)
-      setOverFolderTimer(t)
     } else if (!overNote?.isFolder) {
-      if (overFolderTimer) clearTimeout(overFolderTimer)
+      if (overFolderTimer.current) clearTimeout(overFolderTimer.current)
+      overFolderTimer.current = null
       setOverFolderId(null)
     }
   }
@@ -126,7 +126,8 @@ export default function Sidebar({
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     setDraggingId(null)
     setOverFolderId(null)
-    if (overFolderTimer) clearTimeout(overFolderTimer)
+    if (overFolderTimer.current) clearTimeout(overFolderTimer.current)
+    overFolderTimer.current = null
 
     if (!over || active.id === over.id) return
 
