@@ -40,6 +40,7 @@ export default function MarkdownPreview({ yText, awareness: _awareness, onWikili
   const [content, setContent] = useState(() => yText.toString())
 
   useEffect(() => {
+    setContent(yText.toString())
     const handler = () => setContent(yText.toString())
     yText.observe(handler)
     return () => yText.unobserve(handler)
