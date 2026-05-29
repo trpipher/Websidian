@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { db } from '../db.js'
-import type { NoteMeta } from '@websidian/shared'
+import type { NoteMeta, LinkEdge } from '@websidian/shared'
 import { randomUUID } from 'node:crypto'
 import { resolveUserId, canReadProject, requireProjectRole } from '../middleware/project-auth.js'
 
@@ -66,4 +66,34 @@ notesRouter.patch('/:id', requireProjectRole('editor'), async (c) => {
 notesRouter.delete('/:id', requireProjectRole('admin'), (c) => {
   db.prepare('UPDATE notes SET deleted_at = ? WHERE id = ?').run(new Date().toISOString(), c.req.param('id'))
   return c.json({ ok: true })
+})
+
+// GET /:id/backlinks — notes that link to this note (reader access)
+notesRouter.get('/:id/backlinks', async (c) => {
+  const projectId = c.req.param('projectId')!
+  const userId = resolveUserId(c)
+  if (!canReadProject(projectId, userId)) return c.json({ error: 'Not found' }, 404)
+  const id = c.req.param('id')
+  const links = db.prepare(`
+    SELECT n.id, n.path, n.title, n.project_id as projectId,
+           n.created_at as createdAt, n.updated_at as updatedAt
+    FROM note_links l
+    JOIN notes n ON n.id = l.source_id
+    WHERE l.target_id = ? AND n.deleted_at IS NULL
+  `).all(id) as NoteMeta[]
+  return c.json(links)
+})
+
+// GET /graph — all wikilink edges in project (reader access)
+notesRouter.get('/graph', async (c) => {
+  const projectId = c.req.param('projectId')!
+  const userId = resolveUserId(c)
+  if (!canReadProject(projectId, userId)) return c.json({ error: 'Not found' }, 404)
+  const links = db.prepare(`
+    SELECT nl.source_id as sourceId, nl.target_id as targetId
+    FROM note_links nl
+    JOIN notes src ON src.id = nl.source_id AND src.deleted_at IS NULL AND src.project_id = ?
+    JOIN notes tgt ON tgt.id = nl.target_id AND tgt.deleted_at IS NULL
+  `).all(projectId) as LinkEdge[]
+  return c.json(links)
 })

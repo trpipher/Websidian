@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Editor from './components/Editor'
 import Sidebar from './components/Sidebar'
 import PresenceBar from './components/PresenceBar'
 import LoginPage from './components/LoginPage'
 import ProjectSwitcher from './components/ProjectSwitcher'
 import ProjectSettings from './components/ProjectSettings'
+import BacklinksPanel from './components/BacklinksPanel'
+import NoteGraph from './components/NoteGraph'
 import { useProvider } from './hooks/useProvider'
 import { useNotes } from './hooks/useNotes'
 import { useProjects } from './hooks/useProjects'
@@ -26,6 +28,7 @@ export default function App() {
     () => sessionStorage.getItem('ws-image')
   )
   const [showSettings, setShowSettings] = useState(false)
+  const [showGraph, setShowGraph] = useState(false)
   // Invite token from URL path /invite/:token
   const [pendingInviteToken] = useState<string | null>(() => {
     const match = window.location.pathname.match(/^\/invite\/([a-f0-9]+)$/)
@@ -111,6 +114,23 @@ export default function App() {
   const canEdit = userRole === 'owner' || userRole === 'admin' || userRole === 'editor'
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin'
 
+  const handleWikilinkClick = useCallback((title: string) => {
+    const existing = notes.find(n => n.title === title)
+    if (existing) {
+      setActiveId(existing.id)
+    } else if (canEdit && activeProject) {
+      // create note then navigate to it
+      fetch(`${API}/api/projects/${activeProject.id}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ path: `${title}.md`, title }),
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(n => { if (n?.id) setActiveId(n.id) })
+        .catch(() => {})
+    }
+  }, [notes, canEdit, activeProject, authToken])
+
   if (!authToken) {
     return <LoginPage onLogin={handleLogin} />
   }
@@ -141,6 +161,16 @@ export default function App() {
           </button>
         )}
 
+        {activeProject && (
+          <button
+            onClick={() => setShowGraph(true)}
+            style={{ background: 'none', border: 'none', color: '#6c7086', cursor: 'pointer', fontSize: 12, padding: '2px 4px' }}
+            title="Graph view"
+          >
+            ⬡
+          </button>
+        )}
+
         <PresenceBar awareness={awareness} />
         {!synced && activeId && <span style={{ color: '#6c7086', fontSize: 12 }}>syncing…</span>}
 
@@ -159,14 +189,22 @@ export default function App() {
       </header>
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <Sidebar
-          notes={notes}
-          activeId={activeId}
-          onSelect={setActiveId}
-          onNewNote={canEdit ? () => createNote(`Untitled-${Date.now()}`) : undefined}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', width: 240, flexShrink: 0, borderRight: '1px solid #313244', background: '#1e1e2e', overflow: 'hidden' }}>
+          <Sidebar
+            notes={notes}
+            activeId={activeId}
+            onSelect={setActiveId}
+            onNewNote={canEdit ? () => createNote(`Untitled-${Date.now()}`) : undefined}
+          />
+          <BacklinksPanel
+            noteId={activeId}
+            projectId={activeProject?.id ?? null}
+            token={authToken}
+            onSelect={setActiveId}
+          />
+        </div>
         {activeId && yText
-          ? <Editor yText={yText} awareness={awareness} />
+          ? <Editor yText={yText} awareness={awareness} onWikilinkClick={handleWikilinkClick} />
           : (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6c7086' }}>
               {!activeProject ? 'Select or create a project' : notes.length === 0 ? 'Create your first note' : 'Select a note'}
@@ -181,6 +219,16 @@ export default function App() {
           token={authToken}
           onClose={() => setShowSettings(false)}
           onUpdated={updates => setActiveProject({ ...activeProject, ...updates } as Project)}
+        />
+      )}
+
+      {showGraph && activeProject && (
+        <NoteGraph
+          notes={notes}
+          projectId={activeProject.id}
+          token={authToken}
+          onSelect={id => { setActiveId(id); setShowGraph(false) }}
+          onClose={() => setShowGraph(false)}
         />
       )}
     </div>

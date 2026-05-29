@@ -9,9 +9,10 @@ import { buildExtensions } from '../lib/codemirror'
 interface Props {
   yText: Y.Text
   awareness: Awareness | null
+  onWikilinkClick?: (title: string) => void
 }
 
-export default function Editor({ yText, awareness }: Props) {
+export default function Editor({ yText, awareness, onWikilinkClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
 
@@ -22,7 +23,7 @@ export default function Editor({ yText, awareness }: Props) {
 
     const view = new EditorView({
       extensions: [
-        ...buildExtensions(),
+        ...buildExtensions(onWikilinkClick),
         yCollab(yText, awareness, { undoManager }),
         keymap.of(yUndoManagerKeymap),
       ],

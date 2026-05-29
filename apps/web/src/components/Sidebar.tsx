@@ -11,13 +11,11 @@ export default function Sidebar({ notes, activeId, onSelect, onNewNote }: Props)
   return (
     <aside
       style={{
-        width: 240,
-        borderRight: '1px solid #333',
         padding: 12,
-        background: '#1e1e2e',
         color: '#cdd6f4',
-        flexShrink: 0,
+        flex: 1,
         overflowY: 'auto',
+        minHeight: 0,
       }}
     >
       <div style={{ fontWeight: 700, marginBottom: 12, fontSize: 14 }}>

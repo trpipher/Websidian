@@ -4,9 +4,10 @@ import { oneDark } from '@codemirror/theme-one-dark'
 import { EditorView, lineNumbers, highlightActiveLine, keymap } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { defaultKeymap } from '@codemirror/commands'
+import { wikilinkPlugin } from './wikilinkPlugin'
 
 // history() intentionally omitted — Yjs UndoManager handles undo/redo
-export function buildExtensions() {
+export function buildExtensions(onWikilinkClick?: (title: string) => void) {
   return [
     lineNumbers(),
     highlightActiveLine(),
@@ -16,5 +17,6 @@ export function buildExtensions() {
     oneDark,
     EditorView.lineWrapping,
     EditorState.allowMultipleSelections.of(true),
+    ...(onWikilinkClick ? [wikilinkPlugin(onWikilinkClick)] : []),
   ]
 }
