@@ -15,9 +15,6 @@ db.pragma('foreign_keys = ON')
 const schema = readFileSync(join(__dirname, 'schema.sql'), 'utf8')
 db.exec(schema)
 
-// Run Better Auth migrations
-const { runMigrations } = await import('./routes/auth.js').then(m => ({ runMigrations: () => {} }))
-
 // Add project_id column to notes if not present
 const cols = db.prepare("PRAGMA table_info(notes)").all() as { name: string }[]
 if (!cols.find(c => c.name === 'project_id')) {
