@@ -12,9 +12,10 @@ interface Props {
   onWikilinkClick: (title: string) => void
 }
 
-function parseWikilinks(text: string, onClick: (title: string) => void): React.ReactNode[] {
+function parseWikilinks(text: string, onClick: (title: string) => void, baseKey: number = 0): React.ReactNode[] {
   const parts: React.ReactNode[] = []
   let last = 0
+  let count = 0
   WIKILINK_RE.lastIndex = 0
   let match: RegExpExecArray | null
   while ((match = WIKILINK_RE.exec(text)) !== null) {
@@ -22,7 +23,7 @@ function parseWikilinks(text: string, onClick: (title: string) => void): React.R
     const title = match[1]
     parts.push(
       <span
-        key={match.index}
+        key={`wl-${baseKey}-${count++}`}
         onClick={() => onClick(title)}
         style={{ color: '#89b4fa', cursor: 'pointer', textDecoration: 'underline dotted' }}
       >
@@ -35,7 +36,7 @@ function parseWikilinks(text: string, onClick: (title: string) => void): React.R
   return parts
 }
 
-export default function MarkdownPreview({ yText, onWikilinkClick }: Props) {
+export default function MarkdownPreview({ yText, awareness: _awareness, onWikilinkClick }: Props) {
   const [content, setContent] = useState(() => yText.toString())
 
   useEffect(() => {
@@ -98,7 +99,7 @@ function processChildren(children: React.ReactNode, onClick: (title: string) => 
   if (Array.isArray(children)) {
     return <>{children.map((child, i) =>
       typeof child === 'string'
-        ? <span key={i}>{parseWikilinks(child, onClick)}</span>
+        ? <span key={`text-${i}`}>{parseWikilinks(child, onClick, i)}</span>
         : child
     )}</>
   }
