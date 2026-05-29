@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import Editor from './components/Editor'
+import MarkdownPreview from './components/MarkdownPreview'
 import Sidebar from './components/Sidebar'
 import PresenceBar from './components/PresenceBar'
 import LoginPage from './components/LoginPage'
@@ -29,6 +30,7 @@ export default function App() {
   )
   const [showSettings, setShowSettings] = useState(false)
   const [showGraph, setShowGraph] = useState(false)
+  const [previewMode, setPreviewMode] = useState(true)
   // Invite token from URL path /invite/:token
   const [pendingInviteToken] = useState<string | null>(() => {
     const match = window.location.pathname.match(/^\/invite\/([a-f0-9]+)$/)
@@ -207,6 +209,16 @@ export default function App() {
           </button>
         )}
 
+        {activeId && canEdit && (
+          <button
+            onClick={() => setPreviewMode(m => !m)}
+            style={{ background: 'none', border: 'none', color: '#6c7086', cursor: 'pointer', fontSize: 12, padding: '2px 4px' }}
+            title={previewMode ? 'Switch to edit mode' : 'Switch to preview mode'}
+          >
+            {previewMode ? '✎ Edit' : '☰ Preview'}
+          </button>
+        )}
+
         <PresenceBar awareness={awareness} />
         {!synced && activeId && <span style={{ color: '#6c7086', fontSize: 12 }}>syncing…</span>}
 
@@ -230,7 +242,7 @@ export default function App() {
             notes={notes}
             activeId={activeId}
             onSelect={setActiveId}
-            onNewNote={canEdit ? () => createNote(`Untitled-${Date.now()}`) : undefined}
+            onNewNote={canEdit ? () => { createNote(`Untitled-${Date.now()}`); setPreviewMode(false) } : undefined}
           />
           <BacklinksPanel
             noteId={activeId}
@@ -240,7 +252,10 @@ export default function App() {
           />
         </div>
         {activeId && yText
-          ? <Editor yText={yText} awareness={awareness} onWikilinkClick={handleWikilinkClick} />
+          ? (previewMode
+              ? <MarkdownPreview yText={yText} awareness={awareness} onWikilinkClick={handleWikilinkClick} />
+              : <Editor yText={yText} awareness={awareness} onWikilinkClick={handleWikilinkClick} />
+            )
           : (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6c7086' }}>
               {!activeProject ? 'Select or create a project' : notes.length === 0 ? 'Create your first note' : 'Select a note'}
