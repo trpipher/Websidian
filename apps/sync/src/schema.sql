@@ -138,3 +138,12 @@ CREATE TABLE IF NOT EXISTS oauth_codes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_oauth_codes_client_id ON oauth_codes(client_id);
+
+-- OAuth bridge tokens: let already-logged-in web app users complete the authorize flow
+-- without relying on the Better Auth session cookie crossing origins
+CREATE TABLE IF NOT EXISTS oauth_bridge (
+  token      TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  expires_at TEXT NOT NULL,
+  used       INTEGER NOT NULL DEFAULT 0
+);

@@ -43,9 +43,17 @@ export default function App() {
     setAuthToken(token)
     setUserName(name)
     setUserImage(image ?? null)
-    // After OAuth authorize redirect, resume the flow
+    // After OAuth authorize redirect, resume the flow — validate origin before following
     const redirect = new URLSearchParams(window.location.search).get('redirect')
-    if (redirect) window.location.href = redirect
+    if (redirect) {
+      try {
+        const redirectUrl = new URL(redirect)
+        const apiOrigin = new URL(API).origin
+        if (redirectUrl.origin === apiOrigin || redirectUrl.origin === window.location.origin) {
+          window.location.href = redirect
+        }
+      } catch { /* ignore malformed redirect URLs */ }
+    }
   }
 
   const handleLogout = () => {
@@ -55,6 +63,31 @@ export default function App() {
     setAuthToken(null)
     setUserImage(null)
   }
+
+  // If already logged in and a ?redirect param is present, use bridge token to complete OAuth flow
+  useEffect(() => {
+    if (!authToken) return
+    const redirect = new URLSearchParams(window.location.search).get('redirect')
+    if (!redirect) return
+    try {
+      const redirectUrl = new URL(redirect)
+      const apiOrigin = new URL(API).origin
+      if (redirectUrl.origin !== apiOrigin) return // only follow to sync server
+      // POST to bridge endpoint (sends token in header, not URL) to get a one-time code
+      fetch(`${API}/oauth/bridge`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken}` },
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then((data: { bridge_token?: string } | null) => {
+          if (data?.bridge_token) {
+            redirectUrl.searchParams.set('bridge_token', data.bridge_token)
+            window.location.href = redirectUrl.toString()
+          }
+        })
+        .catch(() => {})
+    } catch { /* ignore malformed redirect */ }
+  }, [])
 
   // Handle OAuth callback: check for existing session after Discord redirect
   useEffect(() => {

@@ -3,6 +3,7 @@ import { getCookie } from 'hono/cookie'
 import { db } from '../db.js'
 import { randomUUID } from 'node:crypto'
 import { signJwt, verifyPkce } from '../lib/jwt.js'
+import { resolveUserId } from '../middleware/project-auth.js'
 
 const BETTER_AUTH_URL = process.env.BETTER_AUTH_URL ?? 'http://localhost:1235'
 const WEB_URL = process.env.WEB_URL ?? 'http://localhost:5173'
@@ -47,10 +48,24 @@ oauthRouter.post('/register', async (c) => {
   }, 201)
 })
 
+// ── Bridge endpoint — lets an already-logged-in web app user get a one-time
+//    code to complete the authorize flow without relying on cross-origin cookies
+oauthRouter.post('/bridge', (c) => {
+  const userId = resolveUserId(c)
+  if (!userId || userId === 'ai-bot') return c.json({ error: 'unauthorized' }, 401)
+
+  const token = randomUUID().replace(/-/g, '')
+  db.prepare(
+    'INSERT INTO oauth_bridge (token, user_id, expires_at, used) VALUES (?, ?, ?, 0)'
+  ).run(token, userId, new Date(Date.now() + 60_000).toISOString())
+
+  return c.json({ bridge_token: token })
+})
+
 // ── Authorization endpoint ───────────────────────────────────────────────────
 oauthRouter.get('/authorize', async (c) => {
   const q = c.req.query()
-  const { client_id, redirect_uri, response_type, code_challenge, code_challenge_method, state } = q
+  const { client_id, redirect_uri, response_type, code_challenge, code_challenge_method, state, bridge_token } = q
 
   if (response_type !== 'code') {
     return c.json({ error: 'unsupported_response_type' }, 400)
@@ -84,15 +99,29 @@ oauthRouter.get('/authorize', async (c) => {
     return c.redirect(`${WEB_URL}?redirect=${encodeURIComponent(returnUrl)}`)
   }
 
-  // Check Better Auth session cookie
-  const sessionToken = getCookie(c, 'better-auth.session_token')
-  if (!sessionToken) return loginRedirect()
+  // Resolve user: bridge token (from web app) takes priority over session cookie
+  let resolvedUserId: string | null = null
 
-  const session = db.prepare(
-    'SELECT userId FROM session WHERE token = ? AND expiresAt > ?'
-  ).get(sessionToken, new Date().toISOString()) as { userId: string } | undefined
+  if (bridge_token) {
+    const bridge = db.prepare(
+      'SELECT user_id FROM oauth_bridge WHERE token = ? AND expires_at > ? AND used = 0'
+    ).get(bridge_token, new Date().toISOString()) as { user_id: string } | undefined
+    if (bridge) {
+      db.prepare('UPDATE oauth_bridge SET used = 1 WHERE token = ?').run(bridge_token)
+      resolvedUserId = bridge.user_id
+    }
+  }
 
-  if (!session) return loginRedirect()
+  if (!resolvedUserId) {
+    // Fall back to Better Auth session cookie
+    const sessionToken = getCookie(c, 'better-auth.session_token')
+    if (!sessionToken) return loginRedirect()
+    const session = db.prepare(
+      'SELECT userId FROM session WHERE token = ? AND expiresAt > ?'
+    ).get(sessionToken, new Date().toISOString()) as { userId: string } | undefined
+    if (!session) return loginRedirect()
+    resolvedUserId = session.userId
+  }
 
   // Auto-approve: issue authorization code
   const code = randomUUID()
@@ -101,7 +130,7 @@ oauthRouter.get('/authorize', async (c) => {
   db.prepare(`
     INSERT INTO oauth_codes (code, client_id, user_id, redirect_uri, code_challenge, expires_at, used)
     VALUES (?, ?, ?, ?, ?, ?, 0)
-  `).run(code, client_id, session.userId, redirect_uri, code_challenge, expiresAt)
+  `).run(code, client_id, resolvedUserId, redirect_uri, code_challenge, expiresAt)
 
   const dest = new URL(redirect_uri)
   dest.searchParams.set('code', code)
