@@ -26,6 +26,11 @@ export default function App() {
     () => sessionStorage.getItem('ws-image')
   )
   const [showSettings, setShowSettings] = useState(false)
+  // Invite token from URL path /invite/:token
+  const [pendingInviteToken] = useState<string | null>(() => {
+    const match = window.location.pathname.match(/^\/invite\/([a-f0-9]+)$/)
+    return match?.[1] ?? null
+  })
 
   const handleLogin = (token: string, name: string, image?: string | null) => {
     sessionStorage.setItem('ws-token', token)
@@ -59,7 +64,26 @@ export default function App() {
   }, [])
 
   const { activeProject, setActiveProject, userRole } = useProjectContext()
-  const { projects, createProject } = useProjects(authToken)
+  const { projects, createProject, refresh: refreshProjects } = useProjects(authToken)
+
+  // Auto-join via invite link once authenticated
+  useEffect(() => {
+    if (!authToken || !pendingInviteToken) return
+    fetch(`${API}/api/invites/${pendingInviteToken}/join`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${authToken}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(async data => {
+        if (data?.projectId) {
+          window.history.replaceState(null, '', '/')
+          await refreshProjects()
+          // find and activate the joined project
+          setActiveProject(projects.find(p => p.id === data.projectId) ?? null)
+        }
+      })
+      .catch(() => {})
+  }, [authToken, pendingInviteToken])
   const [activeId, setActiveId] = useState<string | null>(null)
   const { notes, createNote } = useNotes(activeProject?.id ?? null, authToken)
   const { yText, synced, awareness } = useProvider(activeId, authToken)
