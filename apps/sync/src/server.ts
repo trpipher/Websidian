@@ -2,7 +2,7 @@ import { Server } from '@hocuspocus/server'
 
 const server = Server.configure({
   port: 1234,
-  onConnect() {
+  async onConnect() {
     console.log('client connected')
   },
 })
