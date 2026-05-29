@@ -47,18 +47,16 @@ export default function MarkdownPreview({ yText, awareness: _awareness, onWikili
   }, [yText])
 
   return (
-    <div style={{
-      flex: 1,
-      overflowY: 'auto',
-      padding: '24px 32px',
-      color: '#cdd6f4',
-      fontFamily: 'Georgia, "Times New Roman", serif',
-      fontSize: 15,
-      lineHeight: 1.75,
-      maxWidth: 760,
-      alignSelf: 'flex-start',
-      width: '100%',
-    }}>
+    <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+      <div style={{
+        padding: '24px 32px',
+        color: '#cdd6f4',
+        fontFamily: 'Georgia, "Times New Roman", serif',
+        fontSize: 15,
+        lineHeight: 1.75,
+        maxWidth: 760,
+        margin: '0 auto',
+      }}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -92,6 +90,7 @@ export default function MarkdownPreview({ yText, awareness: _awareness, onWikili
       >
         {content}
       </ReactMarkdown>
+      </div>
     </div>
   )
 }
