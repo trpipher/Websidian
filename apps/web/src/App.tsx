@@ -32,7 +32,10 @@ export default function App() {
     const doc = loadOrCreateDoc(activeId)
     docRef.current = doc
     setYText(doc.getText('content'))
-    return () => { doc.destroy() }
+    return () => {
+      doc.destroy()
+      docRef.current = null
+    }
   }, [activeId])
 
   return (
