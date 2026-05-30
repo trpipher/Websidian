@@ -111,6 +111,7 @@ export default function Sidebar({
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [overFolderId, setOverFolderId] = useState<string | null>(null)
+  const overFolderIdRef = useRef<string | null>(null)
   const overFolderTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [sortConfig, setSortConfig] = useState<SortConfig>(loadSortConfig)
   const [showSortMenu, setShowSortMenu] = useState(false)
@@ -172,34 +173,49 @@ export default function Sidebar({
   }
 
   const onDragOver = ({ over }: DragOverEvent) => {
-    if (!over) { setOverFolderId(null); return }
-    const overNote = notes.find(n => n.id === over.id)
-    if (overNote?.isFolder && over.id !== overFolderId) {
-      if (overFolderTimer.current) clearTimeout(overFolderTimer.current)
-      overFolderTimer.current = setTimeout(() => {
-        setOverFolderId(over.id as string)
-        setExpanded(prev => new Set([...prev, over.id as string]))
-      }, 600)
-    } else if (!overNote?.isFolder) {
+    if (!over) {
       if (overFolderTimer.current) clearTimeout(overFolderTimer.current)
       overFolderTimer.current = null
       setOverFolderId(null)
+      overFolderIdRef.current = null
+      return
+    }
+    const overNote = notes.find(n => n.id === over.id)
+    if (overNote?.isFolder && over.id !== overFolderIdRef.current) {
+      if (overFolderTimer.current) clearTimeout(overFolderTimer.current)
+      overFolderTimer.current = setTimeout(() => {
+        const fid = over.id as string
+        setOverFolderId(fid)
+        overFolderIdRef.current = fid
+        setExpanded(prev => new Set([...prev, fid]))
+      }, 600)
+    } else if (!overNote?.isFolder) {
+      // Don't clear if hovering over a child of the currently tracked folder —
+      // dnd-kit shifts `over` to children after auto-expand, which would cancel the drop
+      const ancestors = getAncestorIds(notes, over.id as string)
+      if (!overFolderIdRef.current || !ancestors.has(overFolderIdRef.current)) {
+        if (overFolderTimer.current) clearTimeout(overFolderTimer.current)
+        overFolderTimer.current = null
+        setOverFolderId(null)
+        overFolderIdRef.current = null
+      }
     }
   }
 
   const onDragEnd = ({ active, over }: DragEndEvent) => {
+    // Capture before clearing — state may be stale in closure if onDragOver cleared it
+    const targetFolderId = overFolderIdRef.current
     setDraggingId(null)
     setOverFolderId(null)
+    overFolderIdRef.current = null
     if (overFolderTimer.current) clearTimeout(overFolderTimer.current)
     overFolderTimer.current = null
 
-    if (!over || active.id === over.id) return
+    if (!over || active.id === over.id || !targetFolderId) return
 
     const draggedId = active.id as string
-    const overId = over.id as string
     const dragged = notes.find(n => n.id === draggedId)
-    const overNote = notes.find(n => n.id === overId)
-    if (!dragged || !overNote) return
+    if (!dragged) return
 
     // Prevent moving folder into its own descendant
     if (dragged.isFolder) {
@@ -210,13 +226,10 @@ export default function Sidebar({
         }
       }
       collectDesc(draggedId)
-      if (desc.has(overId)) return
+      if (desc.has(targetFolderId)) return
     }
 
-    // Only support drop INTO a folder (hover-to-expand, then release)
-    if (overNote.isFolder && overFolderId === overId) {
-      onMove(draggedId, overId)
-    }
+    onMove(draggedId, targetFolderId)
   }
 
   const draggingNote = draggingId ? notes.find(n => n.id === draggingId) : null
