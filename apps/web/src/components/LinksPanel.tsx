@@ -17,22 +17,26 @@ export default function LinksPanel({ noteId, projectId, token, onSelect }: Props
   const [backlinks, setBacklinks] = useState<NoteMeta[]>([])
   const [forwardlinks, setForwardlinks] = useState<NoteMeta[]>([])
 
-  const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
-
   useEffect(() => {
     if (!noteId || !projectId) { setBacklinks([]); return }
-    fetch(`${API}/api/projects/${projectId}/notes/${noteId}/backlinks`, { headers })
+    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+    const controller = new AbortController()
+    fetch(`${API}/api/projects/${projectId}/notes/${noteId}/backlinks`, { headers, signal: controller.signal })
       .then(r => r.ok ? r.json() : [])
       .then(setBacklinks)
-      .catch(() => setBacklinks([]))
+      .catch(err => { if (err.name !== 'AbortError') setBacklinks([]) })
+    return () => controller.abort()
   }, [noteId, projectId, token])
 
   useEffect(() => {
     if (!noteId || !projectId) { setForwardlinks([]); return }
-    fetch(`${API}/api/projects/${projectId}/notes/${noteId}/forwardlinks`, { headers })
+    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+    const controller = new AbortController()
+    fetch(`${API}/api/projects/${projectId}/notes/${noteId}/forwardlinks`, { headers, signal: controller.signal })
       .then(r => r.ok ? r.json() : [])
       .then(setForwardlinks)
-      .catch(() => setForwardlinks([]))
+      .catch(err => { if (err.name !== 'AbortError') setForwardlinks([]) })
+    return () => controller.abort()
   }, [noteId, projectId, token])
 
   const results = activeTab === 'backlinks' ? backlinks : forwardlinks
