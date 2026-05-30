@@ -21,7 +21,7 @@ export default function NoteGraph({ notes, projectId, token, onSelect, onClose }
     fetch(`${API}/api/projects/${projectId}/notes/graph`, { headers })
       .then(r => r.ok ? r.json() : [])
       .then(setLinks)
-      .catch(() => {})
+      .catch(() => { })
   }, [projectId, token])
 
   // Derive content-based keys so graphData only gets a new reference when
@@ -53,12 +53,15 @@ export default function NoteGraph({ notes, projectId, token, onSelect, onClose }
   useEffect(() => {
     const fg = fgRef.current
     if (!fg) return
-    fg.d3Force('charge')?.strength(-400).distanceMax(300)
-    fg.d3Force('link')?.distance(120).iterations(1).strength(0.25)
-    fg.d3Force('center')?.strength(0.05)
+    fg.d3Force('charge')?.strength(-400).distanceMax(150)
+    // fg.d3Force('link')?.distance(150).strength(0.01)
+    fg.d3Force('center')?.strength(0.1)
     // Give every node a personal-space bubble so nodes can't overlap
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    fg.d3Force('collide', forceCollide((node: any) => Math.sqrt((node.val ?? 1) * 4) + 16))
+    fg.d3Force(
+      'collide',
+      forceCollide((node: any) => Math.sqrt((node.val ?? 1) * 4) + 25)
+    );
     fg.d3ReheatSimulation()
   }, [graphData])
 
