@@ -24,17 +24,23 @@ export default function Editor({ yText, awareness, onWikilinkClick }: Props) {
 
     // Initialise CodeMirror with the current Yjs content so yCollab doesn't
     // see an empty document and push a delete-everything op back to the Yjs doc.
-    const view = new EditorView({
-      state: EditorState.create({
-        doc: yText.toString(),
-        extensions: [
-          ...buildExtensions(onWikilinkClick),
-          yCollab(yText, awareness, { undoManager }),
-          keymap.of(yUndoManagerKeymap),
-        ],
-      }),
-      parent: containerRef.current,
-    })
+    let view: EditorView
+    try {
+      view = new EditorView({
+        state: EditorState.create({
+          doc: yText.toString(),
+          extensions: [
+            ...buildExtensions(onWikilinkClick),
+            yCollab(yText, awareness, { undoManager }),
+            keymap.of(yUndoManagerKeymap),
+          ],
+        }),
+        parent: containerRef.current,
+      })
+    } catch (e) {
+      undoManager.destroy()
+      throw e
+    }
     viewRef.current = view
 
     return () => {

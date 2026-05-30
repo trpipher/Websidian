@@ -5,7 +5,7 @@ import * as Y from 'yjs'
 import type { Awareness } from 'y-protocols/awareness'
 import type { ImageMeta } from '@websidian/shared'
 
-const WIKILINK_RE = /\[\[([^\]]+)\]\]/g
+const WIKILINK_RE = /\[\[([^\]\n]+)\]\]/g
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|avif)$/i
 
 interface Props {

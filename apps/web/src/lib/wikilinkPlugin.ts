@@ -1,7 +1,7 @@
 import { EditorView, Decoration, type DecorationSet, ViewPlugin, type ViewUpdate, WidgetType } from '@codemirror/view'
 import { RangeSetBuilder } from '@codemirror/state'
 
-const WIKILINK_RE = /\[\[([^\]]+)\]\]/g
+const WIKILINK_RE = /\[\[([^\]\n]+)\]\]/g
 
 class WikilinkWidget extends WidgetType {
   constructor(private title: string, private onClick: (title: string) => void) {
