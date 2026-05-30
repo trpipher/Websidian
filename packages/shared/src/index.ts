@@ -25,6 +25,15 @@ export interface LinkEdge {
   targetId: string;
 }
 
+export interface ImageMeta {
+  id: string
+  filename: string    // original upload name, e.g. "cat.png"
+  projectId: string
+  mimeType: string
+  size: number        // bytes
+  createdAt: string
+}
+
 export type ProjectRole = 'owner' | 'admin' | 'editor' | 'viewer'
 
 export interface Project {
