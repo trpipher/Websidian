@@ -139,10 +139,12 @@ export default function App() {
     setActiveId(null)
   }, [activeProject?.id])
 
-  // Auto-select first note when notes load
+  // Auto-select first note when notes load — guard ensures notes are from the current project
   useEffect(() => {
-    if (!activeId && notes.length > 0) setActiveId(notes[0].id)
-  }, [notes, activeId])
+    if (!activeId && notes.length > 0 && notes[0].projectId === activeProject?.id) {
+      setActiveId(notes[0].id)
+    }
+  }, [notes, activeId, activeProject?.id])
 
   useEffect(() => {
     if (!awareness) return
