@@ -86,6 +86,8 @@ export default function NewProjectModal({ token, onCreated, onClose }: Props) {
       }
     }
 
+    // Brief pause so the "Done ✓" state is visible before the modal closes
+    if (vaultHandle) await new Promise(r => setTimeout(r, 800))
     onCreated(project)
   }
 
