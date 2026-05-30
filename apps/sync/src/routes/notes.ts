@@ -30,13 +30,14 @@ notesRouter.get('/', async (c) => {
 notesRouter.post('/', requireProjectRole('editor'), async (c) => {
   const projectId = c.req.param('projectId')
   const body = await c.req.json<{
-    path: string
     title: string
     parentId?: string | null
     isFolder?: boolean
   }>()
-  const { path, title, parentId = null, isFolder = false } = body
+  const { title, parentId = null, isFolder = false } = body
   const id = randomUUID()
+  // Path is server-generated using the UUID so duplicate titles never collide
+  const path = `${title.replace(/[^a-z0-9]+/gi, '-')}-${id.slice(0, 8)}.md`
   const now = new Date().toISOString()
 
   // Compute sort_order: max within parent + 1000

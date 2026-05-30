@@ -36,7 +36,6 @@ export function useNotes(projectId: string | null, token: string | null) {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({
-        path: `${title.replace(/[^a-z0-9]+/gi, '-')}.md`,
         title,
         parentId: options?.parentId ?? null,
         isFolder: options?.isFolder ?? false,
