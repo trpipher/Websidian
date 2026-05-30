@@ -68,6 +68,36 @@ if (!noteColNames.has('is_folder')) {
   console.log('[db] added is_folder column to notes')
 }
 
+// Create note_tags table if not present
+const noteTagsExists = db.prepare(
+  "SELECT name FROM sqlite_master WHERE type='table' AND name='note_tags'"
+).get()
+if (!noteTagsExists) {
+  db.exec(`
+    CREATE TABLE note_tags (
+      note_id TEXT NOT NULL REFERENCES notes(id),
+      tag     TEXT NOT NULL,
+      PRIMARY KEY (note_id, tag)
+    )
+  `)
+  console.log('[db] created note_tags table')
+}
+
+// Create note_aliases table if not present
+const noteAliasesExists = db.prepare(
+  "SELECT name FROM sqlite_master WHERE type='table' AND name='note_aliases'"
+).get()
+if (!noteAliasesExists) {
+  db.exec(`
+    CREATE TABLE note_aliases (
+      note_id TEXT NOT NULL REFERENCES notes(id),
+      alias   TEXT NOT NULL,
+      PRIMARY KEY (note_id, alias)
+    )
+  `)
+  console.log('[db] created note_aliases table')
+}
+
 // Create images table if not present
 const imageTableExists = db.prepare(
   "SELECT name FROM sqlite_master WHERE type='table' AND name='images'"
