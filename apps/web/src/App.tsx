@@ -281,14 +281,6 @@ export default function App() {
           </button>
         )}
 
-        <button
-          onClick={() => setShowLinks(s => !s)}
-          title="Toggle linked mentions"
-          style={{ background: 'none', border: 'none', color: showLinks ? '#89b4fa' : '#6c7086', cursor: 'pointer', fontSize: 12, padding: '2px 4px' }}
-        >
-          ⟵⟶
-        </button>
-
         {activeId && canEdit && (
           <button
             onClick={() => setPreviewMode(m => !m)}
@@ -303,6 +295,13 @@ export default function App() {
         {!synced && activeId && <span style={{ color: '#6c7086', fontSize: 12 }}>syncing…</span>}
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={() => setShowLinks(s => !s)}
+            title="Toggle links panel"
+            style={{ background: 'none', border: 'none', color: showLinks ? '#89b4fa' : '#6c7086', cursor: 'pointer', fontSize: 16, padding: '2px 4px', lineHeight: 1 }}
+          >
+            ◨
+          </button>
           {userImage && (
             <img src={userImage} alt={userName} style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} />
           )}
