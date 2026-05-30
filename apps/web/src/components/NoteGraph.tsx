@@ -58,7 +58,7 @@ export default function NoteGraph({ notes, projectId, token, onSelect, onClose }
     fg.d3Force('center')?.strength(0.05)
     // Give every node a personal-space bubble so nodes can't overlap
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    fg.d3Force('collide', forceCollide((node: any) => Math.sqrt((node.val ?? 1) * 4) + 10))
+    fg.d3Force('collide', forceCollide((node: any) => Math.sqrt((node.val ?? 1) * 4) + 16))
     fg.d3ReheatSimulation()
   }, [graphData])
 
