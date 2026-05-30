@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import type { Project } from '@websidian/shared'
-import { readVault } from '../lib/vaultImport'
+import { readVault, readVaultFromFileList } from '../lib/vaultImport'
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:1235'
 
@@ -15,24 +15,40 @@ type Step = 'form' | 'importing' | 'error'
 export default function NewProjectModal({ token, onCreated, onClose }: Props) {
   const [name, setName] = useState('')
   const [vaultHandle, setVaultHandle] = useState<FileSystemDirectoryHandle | null>(null)
+  const [fileList, setFileList] = useState<FileList | null>(null)
   const [step, setStep] = useState<Step>('form')
   const [errorMsg, setErrorMsg] = useState('')
   const [notesTotal, setNotesTotal] = useState(0)
   const [notesDone, setNotesDone] = useState(false)
   const [imagesTotal, setImagesTotal] = useState(0)
   const [imagesDone, setImagesDone] = useState(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Display name for whichever vault source is selected
+  const vaultName = vaultHandle?.name
+    ?? (fileList ? fileList[0]?.webkitRelativePath.split('/')[0] : null)
 
   const handlePickVault = async () => {
-    if (!('showDirectoryPicker' in window)) {
-      setErrorMsg('Your browser does not support folder selection. Use Chrome or Edge.')
-      return
+    if ('showDirectoryPicker' in window) {
+      try {
+        const handle = await (window as any).showDirectoryPicker({ mode: 'read' })
+        setVaultHandle(handle)
+        setFileList(null)
+        setErrorMsg('')
+      } catch {
+        // User cancelled or permission denied — do nothing
+      }
+    } else {
+      // Firefox/Safari fallback: <input webkitdirectory>
+      fileInputRef.current?.click()
     }
-    try {
-      const handle = await (window as any).showDirectoryPicker({ mode: 'read' })
-      setVaultHandle(handle)
+  }
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setFileList(e.target.files)
+      setVaultHandle(null)
       setErrorMsg('')
-    } catch {
-      // User cancelled or permission denied — do nothing
     }
   }
 
@@ -54,9 +70,11 @@ export default function NewProjectModal({ token, onCreated, onClose }: Props) {
     }
     const project = await projRes.json() as Project
 
-    if (vaultHandle) {
+    if (vaultHandle || fileList) {
       // Step 2: Read vault from disk
-      const vaultData = await readVault(vaultHandle)
+      const vaultData = vaultHandle
+        ? await readVault(vaultHandle)
+        : await readVaultFromFileList(fileList!)
       setNotesTotal(vaultData.notes.length)
 
       if (vaultData.notes.length > 0) {
@@ -90,7 +108,7 @@ export default function NewProjectModal({ token, onCreated, onClose }: Props) {
     }
 
     // Brief pause so the "Done ✓" state is visible before the modal closes
-    if (vaultHandle) await new Promise(r => setTimeout(r, 800))
+    if (vaultHandle || fileList) await new Promise(r => setTimeout(r, 800))
     onCreated(project)
   }
 
@@ -146,12 +164,22 @@ export default function NewProjectModal({ token, onCreated, onClose }: Props) {
                 <button onClick={handlePickVault} style={btnSecondary}>
                   Choose folder
                 </button>
-                {vaultHandle && (
+                {vaultName && (
                   <span style={{ fontSize: 12, color: '#a6e3a1' }}>
-                    📁 {vaultHandle.name}
+                    📁 {vaultName}
                   </span>
                 )}
               </div>
+              {/* Fallback for browsers without showDirectoryPicker (Firefox, Safari) */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                style={{ display: 'none' }}
+                onChange={handleFileInput}
+                // @ts-expect-error -- webkitdirectory is not in React's type defs
+                webkitdirectory="true"
+              />
             </div>
 
             {step === 'error' && (
@@ -165,7 +193,7 @@ export default function NewProjectModal({ token, onCreated, onClose }: Props) {
                 opacity: name.trim() ? 1 : 0.4,
                 cursor: name.trim() ? 'pointer' : 'default',
               }}>
-                {vaultHandle ? 'Create & Import' : 'Create'}
+                {vaultHandle || fileList ? 'Create & Import' : 'Create'}
               </button>
             </div>
           </>
