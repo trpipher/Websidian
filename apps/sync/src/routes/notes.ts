@@ -76,43 +76,50 @@ notesRouter.get('/search', async (c) => {
   const ftsTerm = q.replace(/[^a-zA-Z0-9 ]/g, ' ').trim() + '*'
   const likeTerm = `%${q}%`
 
+  // _rank: 0 = title match, 1 = body-only FTS, 2 = alias, 3 = tag
   const rows = db.prepare(`
-    SELECT n.id, n.path, n.title, n.project_id as projectId,
-           n.created_at as createdAt, n.updated_at as updatedAt,
-           n.parent_id as parentId,
-           COALESCE(n.sort_order, n.rowid * 1000) as sortOrder,
-           COALESCE(n.is_folder, 0) as isFolder,
-           'fts' as matchType
-    FROM notes_fts fts
-    JOIN notes n ON n.rowid = fts.rowid
-    WHERE notes_fts MATCH ? AND n.project_id = ? AND n.deleted_at IS NULL
+    SELECT id, path, title, projectId, createdAt, updatedAt, parentId, sortOrder, isFolder, matchType
+    FROM (
+      SELECT n.id, n.path, n.title, n.project_id as projectId,
+             n.created_at as createdAt, n.updated_at as updatedAt,
+             n.parent_id as parentId,
+             COALESCE(n.sort_order, n.rowid * 1000) as sortOrder,
+             COALESCE(n.is_folder, 0) as isFolder,
+             'fts' as matchType,
+             (CASE WHEN n.title LIKE ? THEN 0 ELSE 1 END) as _rank
+      FROM notes_fts fts
+      JOIN notes n ON n.rowid = fts.rowid
+      WHERE notes_fts MATCH ? AND n.project_id = ? AND n.deleted_at IS NULL
 
-    UNION
+      UNION
 
-    SELECT n.id, n.path, n.title, n.project_id as projectId,
-           n.created_at as createdAt, n.updated_at as updatedAt,
-           n.parent_id as parentId,
-           COALESCE(n.sort_order, n.rowid * 1000) as sortOrder,
-           COALESCE(n.is_folder, 0) as isFolder,
-           'tag' as matchType
-    FROM notes n
-    JOIN note_tags t ON t.note_id = n.id
-    WHERE t.tag LIKE ? AND n.project_id = ? AND n.deleted_at IS NULL
+      SELECT n.id, n.path, n.title, n.project_id as projectId,
+             n.created_at as createdAt, n.updated_at as updatedAt,
+             n.parent_id as parentId,
+             COALESCE(n.sort_order, n.rowid * 1000) as sortOrder,
+             COALESCE(n.is_folder, 0) as isFolder,
+             'alias' as matchType,
+             2 as _rank
+      FROM notes n
+      JOIN note_aliases a ON a.note_id = n.id
+      WHERE a.alias LIKE ? AND n.project_id = ? AND n.deleted_at IS NULL
 
-    UNION
+      UNION
 
-    SELECT n.id, n.path, n.title, n.project_id as projectId,
-           n.created_at as createdAt, n.updated_at as updatedAt,
-           n.parent_id as parentId,
-           COALESCE(n.sort_order, n.rowid * 1000) as sortOrder,
-           COALESCE(n.is_folder, 0) as isFolder,
-           'alias' as matchType
-    FROM notes n
-    JOIN note_aliases a ON a.note_id = n.id
-    WHERE a.alias LIKE ? AND n.project_id = ? AND n.deleted_at IS NULL
-
+      SELECT n.id, n.path, n.title, n.project_id as projectId,
+             n.created_at as createdAt, n.updated_at as updatedAt,
+             n.parent_id as parentId,
+             COALESCE(n.sort_order, n.rowid * 1000) as sortOrder,
+             COALESCE(n.is_folder, 0) as isFolder,
+             'tag' as matchType,
+             3 as _rank
+      FROM notes n
+      JOIN note_tags t ON t.note_id = n.id
+      WHERE t.tag LIKE ? AND n.project_id = ? AND n.deleted_at IS NULL
+    )
+    ORDER BY _rank ASC
     LIMIT 20
-  `).all(ftsTerm, projectId, likeTerm, projectId, likeTerm, projectId) as
+  `).all(likeTerm, ftsTerm, projectId, likeTerm, projectId, likeTerm, projectId) as
     (Omit<NoteMeta, 'isFolder' | 'aliases'> & { isFolder: number; matchType: string })[]
 
   return c.json(rows.map(n => ({
