@@ -10,6 +10,7 @@ import BacklinksPanel from './components/BacklinksPanel'
 import NoteGraph from './components/NoteGraph'
 import { useProvider } from './hooks/useProvider'
 import { useNotes } from './hooks/useNotes'
+import { useImages } from './hooks/useImages'
 import { useProjects } from './hooks/useProjects'
 import { useProjectContext } from './contexts/ProjectContext'
 import type { Project } from '@websidian/shared'
@@ -127,6 +128,7 @@ export default function App() {
   }, [authToken, pendingInviteToken])
   const [activeId, setActiveId] = useState<string | null>(null)
   const { notes, createNote, renameNote, deleteNote, moveNote } = useNotes(activeProject?.id ?? null, authToken)
+  const { images, uploadImage } = useImages(activeProject?.id ?? null, authToken)
   const { yText, synced, awareness } = useProvider(activeId, authToken)
 
   // Auto-select first project on load
@@ -262,6 +264,7 @@ export default function App() {
               if (activeId === id) setActiveId(null)
             }}
             onMove={(id, parentId) => moveNote(id, parentId)}
+            onUploadImage={uploadImage}
           />
           <BacklinksPanel
             noteId={activeId}
@@ -272,7 +275,7 @@ export default function App() {
         </div>
         {activeId && yText
           ? (previewMode
-              ? <MarkdownPreview yText={yText} awareness={awareness} onWikilinkClick={handleWikilinkClick} />
+              ? <MarkdownPreview yText={yText} awareness={awareness} onWikilinkClick={handleWikilinkClick} images={images} />
               : <Editor yText={yText} awareness={awareness} onWikilinkClick={handleWikilinkClick} />
             )
           : (
