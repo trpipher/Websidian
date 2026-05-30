@@ -257,7 +257,7 @@ export default function App() {
               deleteNote(id)
               if (activeId === id) setActiveId(null)
             }}
-            onMove={(id, parentId, sortOrder) => moveNote(id, parentId, sortOrder)}
+            onMove={(id, parentId) => moveNote(id, parentId)}
           />
           <BacklinksPanel
             noteId={activeId}
