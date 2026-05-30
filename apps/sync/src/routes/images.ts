@@ -78,6 +78,21 @@ imagesRouter.get('/', async (c) => {
   return c.json(rows)
 })
 
+// ── Rename image ───────────────────────────────────────────────────────────────
+imagesRouter.patch('/:imageId', requireProjectRole('editor'), async (c) => {
+  const projectId = c.req.param('projectId')!
+  const imageId = c.req.param('imageId')!
+  const { filename } = await c.req.json<{ filename: string }>()
+  if (!filename?.trim()) return c.json({ error: 'filename required' }, 400)
+
+  const result = db.prepare(
+    'UPDATE images SET filename = ? WHERE id = ? AND project_id = ?'
+  ).run(filename.trim(), imageId, projectId)
+
+  if (result.changes === 0) return c.json({ error: 'Not found' }, 404)
+  return c.json({ id: imageId, filename: filename.trim() })
+})
+
 // ── Serve image bytes ──────────────────────────────────────────────────────────
 imagesRouter.get('/:imageId', async (c) => {
   const projectId = c.req.param('projectId')!

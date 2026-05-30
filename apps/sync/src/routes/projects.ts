@@ -30,7 +30,7 @@ projectsRouter.get('/', (c) => {
   const userId = resolveUserId(c)
   if (!userId) return c.json({ error: 'Unauthorized' }, 401)
 
-  const rows = db.prepare(`
+  const rows = (db.prepare(`
     SELECT p.id, p.name, p.slug, p.description, p.is_public as isPublic,
            p.owner_id as ownerId, p.created_at as createdAt, p.updated_at as updatedAt,
            pm.role
@@ -38,7 +38,7 @@ projectsRouter.get('/', (c) => {
     JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?
     WHERE p.deleted_at IS NULL
     ORDER BY p.updated_at DESC
-  `).all(userId) as Project[]
+  `).all(userId) as any[]).map(r => ({ ...r, isPublic: Boolean(r.isPublic) })) as Project[]
   return c.json(rows)
 })
 
@@ -73,13 +73,14 @@ projectsRouter.get('/:id', (c) => {
   const projectId = c.req.param('id')
   if (!canReadProject(projectId, userId)) return c.json({ error: 'Not found' }, 404)
 
-  const row = db.prepare(`
+  const raw = db.prepare(`
     SELECT p.id, p.name, p.slug, p.description, p.is_public as isPublic,
            p.owner_id as ownerId, p.created_at as createdAt, p.updated_at as updatedAt
     FROM projects p WHERE p.id = ? AND p.deleted_at IS NULL
-  `).get(projectId) as Omit<Project, 'role'> | undefined
+  `).get(projectId) as any
 
-  if (!row) return c.json({ error: 'Not found' }, 404)
+  if (!raw) return c.json({ error: 'Not found' }, 404)
+  const row = { ...raw, isPublic: Boolean(raw.isPublic) } as Omit<Project, 'role'>
   const role = userId ? getUserRole(projectId, userId) ?? undefined : undefined
   return c.json({ ...row, role })
 })

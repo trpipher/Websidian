@@ -51,5 +51,17 @@ export function useImages(projectId: string | null, token: string | null) {
     return image
   }, [projectId, token])
 
-  return { images, uploadImage }
+  const renameImage = useCallback(async (imageId: string, filename: string): Promise<boolean> => {
+    if (!projectId || !token) return false
+    const res = await fetch(`${API}/api/projects/${projectId}/images/${imageId}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename }),
+    })
+    if (!res.ok) return false
+    setImages(prev => prev.map(img => img.id === imageId ? { ...img, filename } : img))
+    return true
+  }, [projectId, token])
+
+  return { images, uploadImage, renameImage }
 }

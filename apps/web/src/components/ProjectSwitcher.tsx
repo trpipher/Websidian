@@ -65,7 +65,7 @@ export default function ProjectSwitcher({ projects, activeProject, token, onSele
                 }}
               >
                 {p.name}
-                {p.isPublic && <span style={{ fontSize: 10, color: '#6c7086', marginLeft: 6 }}>public</span>}
+                {!!p.isPublic && <span style={{ fontSize: 10, color: '#6c7086', marginLeft: 6 }}>public</span>}
               </div>
             ))}
 
