@@ -13,7 +13,7 @@ import { useNotes } from './hooks/useNotes'
 import { useImages } from './hooks/useImages'
 import { useProjects } from './hooks/useProjects'
 import { useProjectContext } from './contexts/ProjectContext'
-import type { Project } from '@websidian/shared'
+import type { Project, ImageMeta } from '@websidian/shared'
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:1235'
 const USER_COLORS = ['#f38ba8', '#89b4fa', '#a6e3a1', '#fab387', '#cba6f7']
@@ -127,6 +127,7 @@ export default function App() {
       .catch(() => {})
   }, [authToken, pendingInviteToken])
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [selectedImage, setSelectedImage] = useState<ImageMeta | null>(null)
   const { notes, createNote, renameNote, deleteNote, moveNote } = useNotes(activeProject?.id ?? null, authToken)
   const { images, uploadImage } = useImages(activeProject?.id ?? null, authToken)
   const { yText, synced, awareness } = useProvider(activeId, authToken)
@@ -136,9 +137,10 @@ export default function App() {
     if (!activeProject && projects.length > 0) setActiveProject(projects[0])
   }, [projects, activeProject, setActiveProject])
 
-  // Reset active note when project changes
+  // Reset active note and selected image when project changes
   useEffect(() => {
     setActiveId(null)
+    setSelectedImage(null)
   }, [activeProject?.id])
 
   // Auto-select first note when notes load — guard ensures notes are from the current project
@@ -246,11 +248,11 @@ export default function App() {
             notes={notes}
             activeId={activeId}
             canEdit={canEdit}
-            onSelect={setActiveId}
+            onSelect={id => { setActiveId(id); setSelectedImage(null) }}
             onNewNote={(parentId) => {
               if (!canEdit) return
               createNote('Untitled', { parentId }).then(note => {
-                if (note?.id) setActiveId(note.id)
+                if (note?.id) { setActiveId(note.id); setSelectedImage(null) }
               })
               setPreviewMode(false)
             }}
@@ -265,6 +267,9 @@ export default function App() {
             }}
             onMove={(id, parentId) => moveNote(id, parentId)}
             onUploadImage={uploadImage}
+            images={images}
+            selectedImageId={selectedImage?.id ?? null}
+            onSelectImage={img => { setSelectedImage(img); setActiveId(null) }}
           />
           <BacklinksPanel
             noteId={activeId}
@@ -273,16 +278,27 @@ export default function App() {
             onSelect={setActiveId}
           />
         </div>
-        {activeId && yText
-          ? (previewMode
-              ? <MarkdownPreview yText={yText} awareness={awareness} onWikilinkClick={handleWikilinkClick} images={images} />
-              : <Editor yText={yText} awareness={awareness} onWikilinkClick={handleWikilinkClick} />
-            )
-          : (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6c7086' }}>
-              {!activeProject ? 'Select or create a project' : notes.length === 0 ? 'Create your first note' : 'Select a note'}
+        {selectedImage
+          ? (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, overflowY: 'auto' }}>
+              <div style={{ color: '#6c7086', fontSize: 12, marginBottom: 12 }}>{selectedImage.filename}</div>
+              <img
+                src={`/api/projects/${selectedImage.projectId}/images/${selectedImage.id}`}
+                alt={selectedImage.filename}
+                style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: 6, display: 'block' }}
+              />
             </div>
           )
+          : activeId && yText
+            ? (previewMode
+                ? <MarkdownPreview yText={yText} awareness={awareness} onWikilinkClick={handleWikilinkClick} images={images} />
+                : <Editor yText={yText} awareness={awareness} onWikilinkClick={handleWikilinkClick} />
+              )
+            : (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6c7086' }}>
+                {!activeProject ? 'Select or create a project' : notes.length === 0 ? 'Create your first note' : 'Select a note'}
+              </div>
+            )
         }
       </div>
 

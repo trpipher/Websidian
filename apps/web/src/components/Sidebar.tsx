@@ -10,7 +10,7 @@ import {
   type DragOverEvent,
 } from '@dnd-kit/core'
 import { SortableContext } from '@dnd-kit/sortable'
-import type { NoteMeta } from '@websidian/shared'
+import type { NoteMeta, ImageMeta } from '@websidian/shared'
 import SidebarItem from './SidebarItem'
 import SortMenu, { type SortConfig } from './SortMenu'
 
@@ -109,12 +109,16 @@ interface Props {
   onRename: (id: string, title: string) => void
   onDelete: (id: string) => void
   onMove: (id: string, parentId: string | null) => void
-  onUploadImage: (file: File) => Promise<import('@websidian/shared').ImageMeta | null>
+  onUploadImage: (file: File) => Promise<ImageMeta | null>
+  images: ImageMeta[]
+  selectedImageId: string | null
+  onSelectImage: (image: ImageMeta) => void
 }
 
 export default function Sidebar({
   notes, activeId, canEdit,
   onSelect, onNewNote, onNewFolder, onRename, onDelete, onMove, onUploadImage,
+  images, selectedImageId, onSelectImage,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [draggingId, setDraggingId] = useState<string | null>(null)
@@ -363,6 +367,34 @@ export default function Sidebar({
           )}
         </DragOverlay>
       </DndContext>
+
+      {images.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ padding: '0 4px', marginBottom: 4 }}>
+            <span style={{ fontWeight: 700, fontSize: 13, color: '#6c7086' }}>Images</span>
+          </div>
+          {images.map(img => (
+            <div
+              key={img.id}
+              onClick={() => onSelectImage(img)}
+              style={{
+                padding: '4px 8px',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontSize: 13,
+                color: '#cdd6f4',
+                background: selectedImageId === img.id ? '#313244' : 'transparent',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+              title={img.filename}
+            >
+              🖼 {img.filename}
+            </div>
+          ))}
+        </div>
+      )}
 
       {showSortMenu && sortAnchorRect && (
         <SortMenu
