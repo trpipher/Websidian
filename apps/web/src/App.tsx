@@ -162,12 +162,12 @@ export default function App() {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault()
-        setShowSearch(s => !s)
+        if (activeProject) setShowSearch(s => !s)
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [])
+  }, [activeProject])
 
   // Intercept browser / mouse back button — navigate to previous note if available,
   // otherwise let the browser handle it (navigate away from the page)
