@@ -38,7 +38,10 @@ export default function SearchModal({ projectId, token, notes, onSelect, onClose
   const inputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  useEffect(() => { inputRef.current?.focus() }, [])
+  useEffect(() => {
+    inputRef.current?.focus()
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [])
 
   const search = useCallback((q: string) => {
     if (!q.trim()) { setResults([]); return }
