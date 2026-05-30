@@ -28,6 +28,7 @@ services:
       - MCP_PORT=${MCP_PORT:-3100}
       - MCP_BEARER=${MCP_BEARER}
       - MCP_URL=${MCP_URL}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL}
     networks:
       - internal
 
