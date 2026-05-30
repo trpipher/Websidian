@@ -4,6 +4,7 @@ import { cors } from 'hono/cors'
 import { hocuspocus } from './hocuspocus.js'
 import { notesRouter } from './routes/notes.js'
 import { imagesRouter } from './routes/images.js'
+import { importRouter } from './routes/import.js'
 import { authRouter } from './routes/auth.js'
 import { projectsRouter } from './routes/projects.js'
 import { invitesRouter } from './routes/invites.js'
@@ -37,6 +38,7 @@ app.route('/api/projects', projectsRouter)
 app.route('/api/invites', invitesRouter)
 app.route('/api/projects/:projectId/notes', notesRouter)
 app.route('/api/projects/:projectId/images', imagesRouter)
+app.route('/api/projects/:projectId/import', importRouter)
 
 serve({ fetch: app.fetch, port: 1235 }, () =>
   console.log('API on http://localhost:1235')
