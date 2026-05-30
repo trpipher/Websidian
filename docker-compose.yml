@@ -1,0 +1,54 @@
+services:
+  sync:
+    build:
+      context: .
+      dockerfile: apps/sync/Dockerfile
+    environment:
+      - DB_PATH=/data/websidian.db
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL}
+      - WEB_URL=${WEB_URL}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
+      - AI_BOT_TOKEN=${AI_BOT_TOKEN}
+    volumes:
+      - sync_data:/data
+    networks:
+      - internal
+
+  mcp:
+    build:
+      context: .
+      dockerfile: apps/mcp/Dockerfile
+    environment:
+      - MCP_PORT=${MCP_PORT:-3100}
+      - MCP_BEARER=${MCP_BEARER}
+      - MCP_URL=${MCP_URL}
+    networks:
+      - internal
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./apps/web/dist:/srv/web:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - sync
+      - mcp
+    networks:
+      - internal
+
+volumes:
+  sync_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  internal:

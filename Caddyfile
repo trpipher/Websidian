@@ -1,0 +1,19 @@
+your-domain.com {
+  # MCP endpoint — matched before the WS and API blocks
+  reverse_proxy /mcp* mcp:3100
+
+  # REST API + auth routes
+  reverse_proxy /api/* sync:1235
+  reverse_proxy /oauth/* sync:1235
+
+  # WebSocket upgrade for Hocuspocus real-time sync
+  @ws {
+    header Connection *Upgrade*
+    header Upgrade websocket
+  }
+  reverse_proxy @ws sync:1234
+
+  # Static web app (built output from apps/web/dist/)
+  root * /srv/web
+  file_server
+}
