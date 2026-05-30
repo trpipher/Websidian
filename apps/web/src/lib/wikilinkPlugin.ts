@@ -49,8 +49,8 @@ export function wikilinkPlugin(onNavigate: (target: string) => void) {
           while ((match = WIKILINK_RE.exec(text)) !== null) {
             const target = match[1]
             const alias = match[2]
-            // Show alias if present, otherwise show [[target]]
-            const display = alias ?? `[[${target}]]`
+            // Always show the full wikilink text in the editor so it stays editable
+            const display = alias ? `[[${target}|${alias}]]` : `[[${target}]]`
             const start = from + match.index
             const end = start + match[0].length
             builder.add(start, end, Decoration.replace({
