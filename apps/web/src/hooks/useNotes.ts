@@ -1,19 +1,26 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { NoteMeta } from '@websidian/shared'
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:1235'
 
 export function useNotes(projectId: string | null, token: string | null) {
   const [notes, setNotes] = useState<NoteMeta[]>([])
+  // Always-current ref so in-flight fetches can detect a project switch
+  const projectIdRef = useRef(projectId)
+  projectIdRef.current = projectId
 
   // Clear stale notes immediately when project changes so auto-select can't pick old notes
   useEffect(() => { setNotes([]) }, [projectId])
 
   const refresh = useCallback(async () => {
     if (!projectId) return
+    const fetchingFor = projectId  // snapshot at call time
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
     const res = await fetch(`${API}/api/projects/${projectId}/notes`, { headers })
-    if (res.ok) setNotes(await res.json())
+    // Discard results if the project changed while this fetch was in-flight
+    if (res.ok && fetchingFor === projectIdRef.current) {
+      setNotes(await res.json())
+    }
   }, [projectId, token])
 
   useEffect(() => {
