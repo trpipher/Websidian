@@ -1,9 +1,43 @@
 import { useEffect, useState, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkFrontmatter from 'remark-frontmatter'
 import * as Y from 'yjs'
 import type { Awareness } from 'y-protocols/awareness'
 import type { ImageMeta } from '@websidian/shared'
+
+const FRONTMATTER_RE_CLIENT = /^---\r?\n([\s\S]*?)\r?\n---/
+
+interface ParsedFrontmatter {
+  tags: string[]
+  aliases: string[]
+  rest: Record<string, unknown>
+}
+
+function parseFrontmatter(content: string): ParsedFrontmatter | null {
+  const match = FRONTMATTER_RE_CLIENT.exec(content)
+  if (!match) return null
+  try {
+    const lines = match[1].split('\n')
+    const result: Record<string, unknown> = {}
+    for (const line of lines) {
+      const colon = line.indexOf(':')
+      if (colon === -1) continue
+      const key = line.slice(0, colon).trim()
+      const raw = line.slice(colon + 1).trim()
+      if (raw.startsWith('[') && raw.endsWith(']')) {
+        result[key] = raw.slice(1, -1).split(',').map(s => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean)
+      } else {
+        result[key] = raw
+      }
+    }
+    const toArr = (v: unknown) => Array.isArray(v) ? v.map(String) : typeof v === 'string' ? v.split(',').map(s => s.trim()).filter(Boolean) : []
+    const { tags: rawTags, aliases: rawAliases, ...rest } = result
+    return { tags: toArr(rawTags), aliases: toArr(rawAliases), rest }
+  } catch {
+    return null
+  }
+}
 
 // Group 1: target (path or title); Group 2: optional alias/display text
 const WIKILINK_RE = /\[\[([^\]\n\[|]+?)(?:\|([^\]\n\[]+))?\]\]/g
@@ -85,6 +119,8 @@ export default function MarkdownPreview({ yText, awareness: _awareness, onWikili
     return () => yText.unobserve(handler)
   }, [yText])
 
+  const fm = parseFrontmatter(content)
+
   return (
     <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
       <div style={{
@@ -96,8 +132,44 @@ export default function MarkdownPreview({ yText, awareness: _awareness, onWikili
         maxWidth: 760,
         margin: '0 auto',
       }}>
+      {fm && (
+        <div style={{
+          border: '1px solid #313244',
+          borderRadius: 6,
+          padding: '8px 12px',
+          marginBottom: 12,
+          fontSize: 12,
+          color: '#a6adc8',
+        }}>
+          {fm.tags.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ minWidth: 60, color: '#6c7086' }}>tags</span>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {fm.tags.map(tag => (
+                  <span key={tag} style={{
+                    background: '#313244', color: '#cdd6f4',
+                    borderRadius: 4, padding: '1px 6px', fontSize: 11,
+                  }}>{tag}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          {fm.aliases.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ minWidth: 60, color: '#6c7086' }}>aliases</span>
+              <span>{fm.aliases.join(', ')}</span>
+            </div>
+          )}
+          {Object.entries(fm.rest).map(([key, val]) => (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ minWidth: 60, color: '#6c7086' }}>{key}</span>
+              <span>{String(val)}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkFrontmatter]}
         components={{
           p({ children }) {
             const processed = processChildren(children, onWikilinkClick, imagesByName)
