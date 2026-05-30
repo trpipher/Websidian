@@ -212,6 +212,25 @@ notesRouter.get('/:id/backlinks', async (c) => {
   return c.json(links.map(n => ({ ...n, isFolder: Boolean(n.isFolder), aliases: [] as string[] })))
 })
 
+// ── Forward links ──────────────────────────────────────────────────────────────
+notesRouter.get('/:id/forwardlinks', async (c) => {
+  const projectId = c.req.param('projectId')!
+  const userId = resolveUserId(c)
+  if (!canReadProject(projectId, userId)) return c.json({ error: 'Not found' }, 404)
+  const id = c.req.param('id')
+  const links = db.prepare(`
+    SELECT n.id, n.path, n.title, n.project_id as projectId,
+           n.created_at as createdAt, n.updated_at as updatedAt,
+           n.parent_id as parentId,
+           COALESCE(n.sort_order, n.rowid * 1000) as sortOrder,
+           COALESCE(n.is_folder, 0) as isFolder
+    FROM note_links l
+    JOIN notes n ON n.id = l.target_id
+    WHERE l.source_id = ? AND n.deleted_at IS NULL
+  `).all(id) as (Omit<NoteMeta, 'isFolder' | 'aliases'> & { isFolder: number })[]
+  return c.json(links.map(n => ({ ...n, isFolder: Boolean(n.isFolder), aliases: [] as string[] })))
+})
+
 // ── Graph ─────────────────────────────────────────────────────────────────────
 notesRouter.get('/graph', async (c) => {
   const projectId = c.req.param('projectId')!
