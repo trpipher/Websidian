@@ -3,7 +3,7 @@ import { RangeSetBuilder } from '@codemirror/state'
 
 // Group 1: target (path or title, e.g. "Folder/Note" or "Note")
 // Group 2: optional display alias (e.g. "Display Name")
-const WIKILINK_RE = /\[\[([^\]\n|]+?)(?:\|([^\]\n]+))?\]\]/g
+const WIKILINK_RE = /\[\[([^\]\n\[|]+?)(?:\|([^\]\n\[]+))?\]\]/g
 
 class WikilinkWidget extends WidgetType {
   constructor(

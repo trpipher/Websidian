@@ -6,7 +6,7 @@ import type { Awareness } from 'y-protocols/awareness'
 import type { ImageMeta } from '@websidian/shared'
 
 // Group 1: target (path or title); Group 2: optional alias/display text
-const WIKILINK_RE = /\[\[([^\]\n|]+?)(?:\|([^\]\n]+))?\]\]/g
+const WIKILINK_RE = /\[\[([^\]\n\[|]+?)(?:\|([^\]\n\[]+))?\]\]/g
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|avif)$/i
 
 interface Props {

@@ -2,7 +2,7 @@ import * as Y from 'yjs'
 import { db } from './db.js'
 
 // Group 1: target (path or title); Group 2: optional alias — ignored for link resolution
-const WIKILINK_RE = /\[\[([^\]\n|]+?)(?:\|[^\]\n]+)?\]\]/g
+const WIKILINK_RE = /\[\[([^\]\n\[|]+?)(?:\|[^\]\n\[]+)?\]\]/g
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|avif)$/i
 
 function extractWikilinks(content: string): string[] {
