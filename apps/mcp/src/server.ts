@@ -126,10 +126,17 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
   const chunks: Buffer[] = []
   req.on('data', (chunk: Buffer) => chunks.push(chunk))
   req.on('end', async () => {
-    const body = chunks.length
-      ? JSON.parse(Buffer.concat(chunks).toString())
-      : undefined
-    await transport.handleRequest(req, res, body)
+    try {
+      const body = chunks.length
+        ? JSON.parse(Buffer.concat(chunks).toString())
+        : undefined
+      await transport.handleRequest(req, res, body)
+    } catch {
+      if (!res.headersSent) {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: 'invalid_request' }))
+      }
+    }
   })
 })
 
