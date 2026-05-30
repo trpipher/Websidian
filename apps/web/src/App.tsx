@@ -8,6 +8,7 @@ import ProjectSwitcher from './components/ProjectSwitcher'
 import ProjectSettings from './components/ProjectSettings'
 import BacklinksPanel from './components/BacklinksPanel'
 import NoteGraph from './components/NoteGraph'
+import SearchModal from './components/SearchModal'
 import { useProvider } from './hooks/useProvider'
 import { useNotes } from './hooks/useNotes'
 import { useImages } from './hooks/useImages'
@@ -31,6 +32,7 @@ export default function App() {
   )
   const [showSettings, setShowSettings] = useState(false)
   const [showGraph, setShowGraph] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
   const [previewMode, setPreviewMode] = useState(true)
   // Invite token from URL path /invite/:token
   const [pendingInviteToken] = useState<string | null>(() => {
@@ -156,6 +158,17 @@ export default function App() {
     history.pushState({ wsNoteId: activeId }, '')
   }, [activeId])
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowSearch(s => !s)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
   // Intercept browser / mouse back button — navigate to previous note if available,
   // otherwise let the browser handle it (navigate away from the page)
   useEffect(() => {
@@ -207,6 +220,7 @@ export default function App() {
       : undefined
     // Fall back to title lookup
     if (!existing) existing = notes.find(n => !n.isFolder && n.title === target)
+    if (!existing) existing = notes.find(n => n.aliases.some(a => a.toLowerCase() === target.toLowerCase()))
 
     if (existing) {
       setActiveId(existing.id)
@@ -369,6 +383,16 @@ export default function App() {
           token={authToken}
           onSelect={id => { setActiveId(id); setShowGraph(false) }}
           onClose={() => setShowGraph(false)}
+        />
+      )}
+
+      {showSearch && activeProject && (
+        <SearchModal
+          projectId={activeProject.id}
+          token={authToken}
+          notes={notes}
+          onSelect={id => { setActiveId(id); setSelectedImage(null); setShowSearch(false) }}
+          onClose={() => setShowSearch(false)}
         />
       )}
     </div>
