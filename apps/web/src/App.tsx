@@ -245,7 +245,9 @@ export default function App() {
             onSelect={setActiveId}
             onNewNote={(parentId) => {
               if (!canEdit) return
-              createNote(`Untitled-${Date.now()}`, { parentId })
+              createNote(`Untitled-${Date.now()}`, { parentId }).then(note => {
+                if (note?.id) setActiveId(note.id)
+              })
               setPreviewMode(false)
             }}
             onNewFolder={(parentId) => {

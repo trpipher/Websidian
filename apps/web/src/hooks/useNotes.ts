@@ -6,6 +6,9 @@ const API = import.meta.env.VITE_API_URL ?? 'http://localhost:1235'
 export function useNotes(projectId: string | null, token: string | null) {
   const [notes, setNotes] = useState<NoteMeta[]>([])
 
+  // Clear stale notes immediately when project changes so auto-select can't pick old notes
+  useEffect(() => { setNotes([]) }, [projectId])
+
   const refresh = useCallback(async () => {
     if (!projectId) return
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
@@ -27,9 +30,9 @@ export function useNotes(projectId: string | null, token: string | null) {
   const createNote = useCallback(async (
     title: string,
     options?: { parentId?: string | null; isFolder?: boolean },
-  ) => {
-    if (!projectId || !token) return
-    await fetch(`${API}/api/projects/${projectId}/notes`, {
+  ): Promise<NoteMeta | null> => {
+    if (!projectId || !token) return null
+    const res = await fetch(`${API}/api/projects/${projectId}/notes`, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({
@@ -40,6 +43,7 @@ export function useNotes(projectId: string | null, token: string | null) {
       }),
     })
     await refresh()
+    return res.ok ? (await res.json() as NoteMeta) : null
   }, [projectId, token, authHeaders, refresh])
 
   const renameNote = useCallback(async (id: string, title: string) => {
