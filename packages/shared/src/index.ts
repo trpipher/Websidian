@@ -8,6 +8,7 @@ export interface NoteMeta {
   parentId: string | null;
   sortOrder: number;
   isFolder: boolean;
+  aliases: string[];  // empty array when no aliases declared
 }
 
 export interface Note extends NoteMeta {
