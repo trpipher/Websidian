@@ -207,8 +207,8 @@ notesRouter.get('/:id/backlinks', async (c) => {
            COALESCE(n.is_folder, 0) as isFolder
     FROM note_links l
     JOIN notes n ON n.id = l.source_id
-    WHERE l.target_id = ? AND n.deleted_at IS NULL
-  `).all(id) as (Omit<NoteMeta, 'isFolder' | 'aliases'> & { isFolder: number })[]
+    WHERE l.target_id = ? AND n.project_id = ? AND n.deleted_at IS NULL
+  `).all(id, projectId) as (Omit<NoteMeta, 'isFolder' | 'aliases'> & { isFolder: number })[]
   return c.json(links.map(n => ({ ...n, isFolder: Boolean(n.isFolder), aliases: [] as string[] })))
 })
 
@@ -226,8 +226,8 @@ notesRouter.get('/:id/forwardlinks', async (c) => {
            COALESCE(n.is_folder, 0) as isFolder
     FROM note_links l
     JOIN notes n ON n.id = l.target_id
-    WHERE l.source_id = ? AND n.deleted_at IS NULL
-  `).all(id) as (Omit<NoteMeta, 'isFolder' | 'aliases'> & { isFolder: number })[]
+    WHERE l.source_id = ? AND n.project_id = ? AND n.deleted_at IS NULL
+  `).all(id, projectId) as (Omit<NoteMeta, 'isFolder' | 'aliases'> & { isFolder: number })[]
   return c.json(links.map(n => ({ ...n, isFolder: Boolean(n.isFolder), aliases: [] as string[] })))
 })
 
