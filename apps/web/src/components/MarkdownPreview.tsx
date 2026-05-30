@@ -1,43 +1,76 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import * as Y from 'yjs'
 import type { Awareness } from 'y-protocols/awareness'
+import type { ImageMeta } from '@websidian/shared'
 
 const WIKILINK_RE = /\[\[([^\]]+)\]\]/g
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|avif)$/i
 
 interface Props {
   yText: Y.Text
   awareness: Awareness | null
   onWikilinkClick: (title: string) => void
+  images: ImageMeta[]
 }
 
-function parseWikilinks(text: string, onClick: (title: string) => void, baseKey: number = 0): React.ReactNode[] {
+function parseWikilinks(
+  text: string,
+  onClick: (title: string) => void,
+  imagesByName: Map<string, ImageMeta>,
+  baseKey: number = 0,
+): React.ReactNode[] {
   const parts: React.ReactNode[] = []
   let last = 0
   let count = 0
   WIKILINK_RE.lastIndex = 0
   let match: RegExpExecArray | null
   while ((match = WIKILINK_RE.exec(text)) !== null) {
-    if (match.index > last) parts.push(text.slice(last, match.index))
     const title = match[1]
-    parts.push(
-      <span
-        key={`wl-${baseKey}-${count++}`}
-        onClick={() => onClick(title)}
-        style={{ color: '#89b4fa', cursor: 'pointer', textDecoration: 'underline dotted' }}
-      >
-        {`[[${title}]]`}
-      </span>
-    )
+    const isEmbed = match.index > 0 && text[match.index - 1] === '!'
+    const startIdx = isEmbed ? match.index - 1 : match.index
+
+    if (startIdx > last) parts.push(text.slice(last, startIdx))
+
+    if (isEmbed && IMAGE_EXT_RE.test(title)) {
+      const img = imagesByName.get(title)
+      if (img) {
+        parts.push(
+          <img
+            key={`img-${baseKey}-${count++}`}
+            src={`/api/projects/${img.projectId}/images/${img.id}`}
+            alt={title}
+            style={{ maxWidth: '100%', borderRadius: 4, display: 'block', margin: '0.5em 0' }}
+          />
+        )
+      } else {
+        parts.push(`![[${title}]]`)
+      }
+    } else {
+      parts.push(
+        <span
+          key={`wl-${baseKey}-${count++}`}
+          onClick={() => onClick(title)}
+          style={{ color: '#89b4fa', cursor: 'pointer', textDecoration: 'underline dotted' }}
+        >
+          {isEmbed ? `![[${title}]]` : `[[${title}]]`}
+        </span>
+      )
+    }
     last = match.index + match[0].length
   }
   if (last < text.length) parts.push(text.slice(last))
   return parts
 }
 
-export default function MarkdownPreview({ yText, awareness: _awareness, onWikilinkClick }: Props) {
+export default function MarkdownPreview({ yText, awareness: _awareness, onWikilinkClick, images }: Props) {
   const [content, setContent] = useState(() => yText.toString())
+
+  const imagesByName = useMemo(
+    () => new Map(images.map(img => [img.filename, img])),
+    [images]
+  )
 
   useEffect(() => {
     setContent(yText.toString())
@@ -61,12 +94,12 @@ export default function MarkdownPreview({ yText, awareness: _awareness, onWikili
         remarkPlugins={[remarkGfm]}
         components={{
           p({ children }) {
-            const processed = processChildren(children, onWikilinkClick)
+            const processed = processChildren(children, onWikilinkClick, imagesByName)
             return <p style={{ marginBottom: '1em' }}>{processed}</p>
           },
-          h1: ({ children }) => <h1 style={{ fontSize: '1.8em', fontWeight: 700, borderBottom: '1px solid #313244', paddingBottom: '0.3em', marginBottom: '0.8em', fontFamily: 'system-ui, sans-serif' }}>{processChildren(children, onWikilinkClick)}</h1>,
-          h2: ({ children }) => <h2 style={{ fontSize: '1.4em', fontWeight: 700, marginBottom: '0.6em', fontFamily: 'system-ui, sans-serif' }}>{processChildren(children, onWikilinkClick)}</h2>,
-          h3: ({ children }) => <h3 style={{ fontSize: '1.2em', fontWeight: 700, marginBottom: '0.5em', fontFamily: 'system-ui, sans-serif' }}>{processChildren(children, onWikilinkClick)}</h3>,
+          h1: ({ children }) => <h1 style={{ fontSize: '1.8em', fontWeight: 700, borderBottom: '1px solid #313244', paddingBottom: '0.3em', marginBottom: '0.8em', fontFamily: 'system-ui, sans-serif' }}>{processChildren(children, onWikilinkClick, imagesByName)}</h1>,
+          h2: ({ children }) => <h2 style={{ fontSize: '1.4em', fontWeight: 700, marginBottom: '0.6em', fontFamily: 'system-ui, sans-serif' }}>{processChildren(children, onWikilinkClick, imagesByName)}</h2>,
+          h3: ({ children }) => <h3 style={{ fontSize: '1.2em', fontWeight: 700, marginBottom: '0.5em', fontFamily: 'system-ui, sans-serif' }}>{processChildren(children, onWikilinkClick, imagesByName)}</h3>,
           pre: ({ children }) => (
             <pre style={{ background: '#181825', borderRadius: 6, padding: '12px 16px', overflowX: 'auto', fontSize: '0.88em', marginBottom: '1em', fontFamily: 'monospace' }}>
               {children}
@@ -80,7 +113,7 @@ export default function MarkdownPreview({ yText, awareness: _awareness, onWikili
           blockquote: ({ children }) => <blockquote style={{ borderLeft: '3px solid #45475a', paddingLeft: 16, color: '#6c7086', margin: '0 0 1em 0' }}>{children}</blockquote>,
           ul: ({ children }) => <ul style={{ paddingLeft: 24, marginBottom: '1em' }}>{children}</ul>,
           ol: ({ children }) => <ol style={{ paddingLeft: 24, marginBottom: '1em' }}>{children}</ol>,
-          li: ({ children }) => <li style={{ marginBottom: '0.25em' }}>{processChildren(children, onWikilinkClick)}</li>,
+          li: ({ children }) => <li style={{ marginBottom: '0.25em' }}>{processChildren(children, onWikilinkClick, imagesByName)}</li>,
           a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer" style={{ color: '#89b4fa' }}>{children}</a>,
           hr: () => <hr style={{ border: 'none', borderTop: '1px solid #313244', margin: '1.5em 0' }} />,
           table: ({ children }) => <table style={{ borderCollapse: 'collapse', marginBottom: '1em', width: '100%' }}>{children}</table>,
@@ -95,15 +128,19 @@ export default function MarkdownPreview({ yText, awareness: _awareness, onWikili
   )
 }
 
-function processChildren(children: React.ReactNode, onClick: (title: string) => void): React.ReactNode {
+function processChildren(
+  children: React.ReactNode,
+  onClick: (title: string) => void,
+  imagesByName: Map<string, ImageMeta>,
+): React.ReactNode {
   if (typeof children === 'string') {
-    const parts = parseWikilinks(children, onClick)
+    const parts = parseWikilinks(children, onClick, imagesByName)
     return parts.length === 1 && typeof parts[0] === 'string' ? parts[0] : <>{parts}</>
   }
   if (Array.isArray(children)) {
     return <>{children.map((child, i) =>
       typeof child === 'string'
-        ? <span key={`text-${i}`}>{parseWikilinks(child, onClick, i)}</span>
+        ? <span key={`text-${i}`}>{parseWikilinks(child, onClick, imagesByName, i)}</span>
         : child
     )}</>
   }
