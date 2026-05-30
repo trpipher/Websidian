@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import type { NoteMeta, LinkEdge } from '@websidian/shared'
 
@@ -42,6 +42,18 @@ export default function NoteGraph({ notes, projectId, token, onSelect, onClose }
     }
   }, [nodesKey, linksKey])
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fgRef = useRef<any>(null)
+
+  // Re-tune forces whenever graph data changes — default charge (-30) is far too weak
+  useEffect(() => {
+    const fg = fgRef.current
+    if (!fg) return
+    fg.d3Force('charge')?.strength(-200)
+    fg.d3Force('link')?.distance(80)
+    fg.d3ReheatSimulation()
+  }, [graphData])
+
   const handleClick = useCallback((node: { id?: string | number }) => {
     if (node.id) onSelect(String(node.id))
   }, [onSelect])
@@ -62,6 +74,7 @@ export default function NoteGraph({ notes, projectId, token, onSelect, onClose }
           ✕
         </button>
         <ForceGraph2D
+          ref={fgRef}
           graphData={graphData}
           nodeLabel="name"
           nodeColor={() => '#89b4fa'}
@@ -71,8 +84,9 @@ export default function NoteGraph({ notes, projectId, token, onSelect, onClose }
           linkDirectionalArrowRelPos={1}
           backgroundColor="#1e1e2e"
           onNodeClick={handleClick}
-          width={800}
-          height={600}
+          cooldownTicks={200}
+          width={1000}
+          height={700}
         />
       </div>
     </div>
