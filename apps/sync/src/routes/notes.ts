@@ -61,7 +61,7 @@ notesRouter.post('/', requireProjectRole('editor'), async (c) => {
 
   return c.json({
     id, path, title, projectId, createdAt: now, updatedAt: now,
-    parentId, sortOrder, isFolder,
+    parentId, sortOrder, isFolder, aliases: [],
   } as NoteMeta, 201)
 })
 
@@ -201,8 +201,8 @@ notesRouter.get('/:id/backlinks', async (c) => {
     FROM note_links l
     JOIN notes n ON n.id = l.source_id
     WHERE l.target_id = ? AND n.deleted_at IS NULL
-  `).all(id) as (Omit<NoteMeta, 'isFolder'> & { isFolder: number })[]
-  return c.json(links.map(n => ({ ...n, isFolder: Boolean(n.isFolder) })))
+  `).all(id) as (Omit<NoteMeta, 'isFolder' | 'aliases'> & { isFolder: number })[]
+  return c.json(links.map(n => ({ ...n, isFolder: Boolean(n.isFolder), aliases: [] as string[] })))
 })
 
 // ── Graph ─────────────────────────────────────────────────────────────────────
