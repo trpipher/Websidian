@@ -116,6 +116,7 @@ export default function Sidebar({
   const [showSortMenu, setShowSortMenu] = useState(false)
   const [sortAnchorRect, setSortAnchorRect] = useState<DOMRect | null>(null)
   const sortButtonRef = useRef<HTMLButtonElement>(null)
+  const sortMenuJustClosed = useRef(false)
 
   // Auto-expand ancestors of the active note
   useEffect(() => {
@@ -147,14 +148,17 @@ export default function Sidebar({
     localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(config))
   }, [])
 
-  const handleSortButtonClick = () => {
-    if (showSortMenu) {
-      setShowSortMenu(false)
-    } else {
-      setSortAnchorRect(sortButtonRef.current?.getBoundingClientRect() ?? null)
-      setShowSortMenu(true)
-    }
-  }
+  const handleCloseSortMenu = useCallback(() => {
+    setShowSortMenu(false)
+    sortMenuJustClosed.current = true
+    setTimeout(() => { sortMenuJustClosed.current = false }, 0)
+  }, [])
+
+  const handleSortButtonClick = useCallback(() => {
+    if (sortMenuJustClosed.current) return
+    setSortAnchorRect(sortButtonRef.current?.getBoundingClientRect() ?? null)
+    setShowSortMenu(prev => !prev)
+  }, [])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
@@ -224,6 +228,9 @@ export default function Sidebar({
           ref={sortButtonRef}
           onClick={handleSortButtonClick}
           title="Sort notes"
+          aria-label="Sort notes"
+          aria-haspopup="menu"
+          aria-expanded={showSortMenu}
           style={{
             background: 'none',
             border: 'none',
@@ -297,7 +304,7 @@ export default function Sidebar({
           config={sortConfig}
           anchorRect={sortAnchorRect}
           onChange={handleSortChange}
-          onClose={() => setShowSortMenu(false)}
+          onClose={handleCloseSortMenu}
         />
       )}
     </aside>
