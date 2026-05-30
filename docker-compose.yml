@@ -42,7 +42,7 @@ services:
 
   caddy:
     image: caddy:2-alpine
-    container_name: websidian
+    container_name: ${COMPOSE_PROJECT_NAME:-websidian}
     expose:
       - 80
     volumes:
