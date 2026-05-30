@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import type { NoteMeta, LinkEdge } from '@websidian/shared'
 
@@ -23,10 +23,16 @@ export default function NoteGraph({ notes, projectId, token, onSelect, onClose }
       .catch(() => {})
   }, [projectId, token])
 
-  const graphData = {
+  // Derive content-based keys so graphData only gets a new reference when
+  // nodes or links actually change — not on every 3-second poll
+  const nodesKey = notes.map(n => `${n.id}:${n.title}`).join('\n')
+  const linksKey = links.map(l => `${l.sourceId}>${l.targetId}`).join('\n')
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const graphData = useMemo(() => ({
     nodes: notes.map(n => ({ id: n.id, name: n.title })),
     links: links.map(l => ({ source: l.sourceId, target: l.targetId })),
-  }
+  }), [nodesKey, linksKey])
 
   const handleClick = useCallback((node: { id?: string | number }) => {
     if (node.id) onSelect(String(node.id))
