@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -173,8 +173,7 @@ export default function Sidebar({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   const tree = buildTree(notes, sortConfig)
-  const visible = flattenVisible(tree, expanded)
-  const visibleIds = visible.map(n => n.id)
+  const visibleIds = flattenVisible(tree, expanded).map(n => n.id)
 
   const onDragStart = ({ active }: DragStartEvent) => {
     setDraggingId(active.id as string)
@@ -233,6 +232,40 @@ export default function Sidebar({
 
   const draggingNote = draggingId ? notes.find(n => n.id === draggingId) : null
 
+  const renderNode = (node: NoteNode): React.ReactNode => {
+    const isExpanded = expanded.has(node.id)
+    const item = (
+      <SidebarItem
+        key={node.id}
+        note={node}
+        depth={node.depth}
+        isActive={node.id === activeId}
+        isExpanded={isExpanded}
+        canEdit={canEdit}
+        onSelect={onSelect}
+        onToggle={toggle}
+        onRename={onRename}
+        onDelete={handleDelete}
+        onNewNote={onNewNote}
+        onNewFolder={onNewFolder}
+        childCount={countDescendants(notes, node.id)}
+      />
+    )
+    if (!node.isFolder) return item
+    return (
+      <div
+        key={`zone-${node.id}`}
+        style={{
+          background: dropZone === node.id ? 'rgba(137, 180, 250, 0.12)' : 'transparent',
+          borderRadius: 6,
+        }}
+      >
+        {item}
+        {isExpanded && node.children.map(child => renderNode(child))}
+      </div>
+    )
+  }
+
   return (
     <aside style={{ padding: 8, color: '#cdd6f4', flex: 1, overflowY: 'auto', minHeight: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8, padding: '0 4px' }}>
@@ -276,32 +309,7 @@ export default function Sidebar({
 
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
         <SortableContext items={visibleIds}>
-          {visible.map(note => {
-            const inZone = dropZone !== undefined && (
-              dropZone === null
-                ? (note.parentId ?? null) === null
-                : note.id === dropZone || getAncestorIds(notes, note.id).has(dropZone)
-            )
-            const isTarget = typeof dropZone === 'string' && note.id === dropZone
-            return (
-            <SidebarItem
-              key={note.id}
-              note={note}
-              depth={note.depth}
-              isActive={note.id === activeId}
-              isExpanded={expanded.has(note.id)}
-              canEdit={canEdit}
-              isInDragZone={inZone}
-              isDragTarget={isTarget}
-              onSelect={onSelect}
-              onToggle={toggle}
-              onRename={onRename}
-              onDelete={handleDelete}
-              onNewNote={onNewNote}
-              onNewFolder={onNewFolder}
-              childCount={countDescendants(notes, note.id)}
-            />
-          )})}
+          {tree.map(node => renderNode(node))}
         </SortableContext>
 
         <DragOverlay>
