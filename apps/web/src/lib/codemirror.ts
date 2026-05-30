@@ -17,6 +17,6 @@ export function buildExtensions(onWikilinkClick?: (title: string) => void) {
     oneDark,
     EditorView.lineWrapping,
     EditorState.allowMultipleSelections.of(true),
-    ...(onWikilinkClick ? [wikilinkPlugin(onWikilinkClick)] : []),
+    ...(onWikilinkClick ? wikilinkPlugin(onWikilinkClick) : []),
   ]
 }
