@@ -40,7 +40,7 @@ export default function NoteGraph({ notes, projectId, token, onSelect, onClose }
       linkCount.set(l.targetId, (linkCount.get(l.targetId) ?? 0) + 1)
     }
     return {
-      nodes: notes.map(n => ({ id: n.id, name: n.title, val: 1 + (linkCount.get(n.id) ?? 0) })),
+      nodes: notes.map(n => ({ id: n.id, name: n.title, val: 2 + Math.sqrt(linkCount.get(n.id) ?? 0) })),
       links: validLinks.map(l => ({ source: l.sourceId, target: l.targetId })),
     }
   }, [nodesKey, linksKey])
@@ -52,9 +52,9 @@ export default function NoteGraph({ notes, projectId, token, onSelect, onClose }
   useEffect(() => {
     const fg = fgRef.current
     if (!fg) return
-    fg.d3Force('charge')?.strength(-800)
-    fg.d3Force('link')?.distance(200).iterations(1)
-    fg.d3Force('center')?.strength(0.02)
+    fg.d3Force('charge')?.strength(-300).distanceMax(200)
+    fg.d3Force('link')?.distance(120).iterations(2)
+    fg.d3Force('center')?.strength(0.08)
     fg.d3ReheatSimulation()
   }, [graphData])
 
