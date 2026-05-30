@@ -30,27 +30,31 @@ export default function NoteGraph({ notes, projectId, token, onSelect, onClose }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const graphData = useMemo(() => {
+    const nodeIds = new Set(notes.map(n => n.id))
+    // Only keep links where both endpoints exist — avoids "node not found" crash
+    const validLinks = links.filter(l => nodeIds.has(l.sourceId) && nodeIds.has(l.targetId))
     // Count total connections (in + out) per node so heavily-linked nodes render larger
     const linkCount = new Map<string, number>()
-    for (const l of links) {
+    for (const l of validLinks) {
       linkCount.set(l.sourceId, (linkCount.get(l.sourceId) ?? 0) + 1)
       linkCount.set(l.targetId, (linkCount.get(l.targetId) ?? 0) + 1)
     }
     return {
       nodes: notes.map(n => ({ id: n.id, name: n.title, val: 1 + (linkCount.get(n.id) ?? 0) })),
-      links: links.map(l => ({ source: l.sourceId, target: l.targetId })),
+      links: validLinks.map(l => ({ source: l.sourceId, target: l.targetId })),
     }
   }, [nodesKey, linksKey])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fgRef = useRef<any>(null)
 
-  // Re-tune forces whenever graph data changes — default charge (-30) is far too weak
+  // Re-tune forces whenever graph data changes
   useEffect(() => {
     const fg = fgRef.current
     if (!fg) return
-    fg.d3Force('charge')?.strength(-200)
-    fg.d3Force('link')?.distance(80)
+    fg.d3Force('charge')?.strength(-600).distanceMax(400)
+    fg.d3Force('link')?.distance(150).iterations(3)
+    fg.d3Force('center')?.strength(0.05)
     fg.d3ReheatSimulation()
   }, [graphData])
 
@@ -84,7 +88,8 @@ export default function NoteGraph({ notes, projectId, token, onSelect, onClose }
           linkDirectionalArrowRelPos={1}
           backgroundColor="#1e1e2e"
           onNodeClick={handleClick}
-          cooldownTicks={200}
+          cooldownTicks={400}
+          warmupTicks={50}
           width={1000}
           height={700}
         />
