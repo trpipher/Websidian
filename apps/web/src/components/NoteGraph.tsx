@@ -29,10 +29,18 @@ export default function NoteGraph({ notes, projectId, token, onSelect, onClose }
   const linksKey = links.map(l => `${l.sourceId}>${l.targetId}`).join('\n')
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const graphData = useMemo(() => ({
-    nodes: notes.map(n => ({ id: n.id, name: n.title })),
-    links: links.map(l => ({ source: l.sourceId, target: l.targetId })),
-  }), [nodesKey, linksKey])
+  const graphData = useMemo(() => {
+    // Count total connections (in + out) per node so heavily-linked nodes render larger
+    const linkCount = new Map<string, number>()
+    for (const l of links) {
+      linkCount.set(l.sourceId, (linkCount.get(l.sourceId) ?? 0) + 1)
+      linkCount.set(l.targetId, (linkCount.get(l.targetId) ?? 0) + 1)
+    }
+    return {
+      nodes: notes.map(n => ({ id: n.id, name: n.title, val: 1 + (linkCount.get(n.id) ?? 0) })),
+      links: links.map(l => ({ source: l.sourceId, target: l.targetId })),
+    }
+  }, [nodesKey, linksKey])
 
   const handleClick = useCallback((node: { id?: string | number }) => {
     if (node.id) onSelect(String(node.id))
@@ -57,7 +65,10 @@ export default function NoteGraph({ notes, projectId, token, onSelect, onClose }
           graphData={graphData}
           nodeLabel="name"
           nodeColor={() => '#89b4fa'}
+          nodeRelSize={4}
           linkColor={() => '#45475a'}
+          linkDirectionalArrowLength={4}
+          linkDirectionalArrowRelPos={1}
           backgroundColor="#1e1e2e"
           onNodeClick={handleClick}
           width={800}
