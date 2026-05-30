@@ -3,7 +3,7 @@ RUN apk add --no-cache python3 make g++
 RUN npm install -g pnpm
 
 WORKDIR /app
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY apps/sync/ ./apps/sync/
 

@@ -2,7 +2,7 @@ FROM node:24-alpine AS base
 RUN npm install -g pnpm
 
 WORKDIR /app
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY apps/mcp/ ./apps/mcp/
 
