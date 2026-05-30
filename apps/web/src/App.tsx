@@ -6,7 +6,7 @@ import PresenceBar from './components/PresenceBar'
 import LoginPage from './components/LoginPage'
 import ProjectSwitcher from './components/ProjectSwitcher'
 import ProjectSettings from './components/ProjectSettings'
-import BacklinksPanel from './components/BacklinksPanel'
+import LinksPanel from './components/LinksPanel'
 import NoteGraph from './components/NoteGraph'
 import SearchModal from './components/SearchModal'
 import { useProvider } from './hooks/useProvider'
@@ -33,6 +33,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showGraph, setShowGraph] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
+  const [showLinks, setShowLinks] = useState(false)
   const [previewMode, setPreviewMode] = useState(true)
   // Invite token from URL path /invite/:token
   const [pendingInviteToken] = useState<string | null>(() => {
@@ -280,6 +281,14 @@ export default function App() {
           </button>
         )}
 
+        <button
+          onClick={() => setShowLinks(s => !s)}
+          title="Toggle linked mentions"
+          style={{ background: 'none', border: 'none', color: showLinks ? '#89b4fa' : '#6c7086', cursor: 'pointer', fontSize: 12, padding: '2px 4px' }}
+        >
+          ⟵⟶
+        </button>
+
         {activeId && canEdit && (
           <button
             onClick={() => setPreviewMode(m => !m)}
@@ -336,12 +345,6 @@ export default function App() {
             selectedImageId={selectedImage?.id ?? null}
             onSelectImage={img => { setSelectedImage(img); setActiveId(null) }}
           />
-          <BacklinksPanel
-            noteId={activeId}
-            projectId={activeProject?.id ?? null}
-            token={authToken}
-            onSelect={setActiveId}
-          />
         </div>
         {selectedImage
           ? (
@@ -365,6 +368,19 @@ export default function App() {
               </div>
             )
         }
+        <div style={{
+          width: showLinks ? 260 : 0,
+          transition: 'width 200ms ease',
+          overflow: 'hidden',
+          flexShrink: 0,
+        }}>
+          <LinksPanel
+            noteId={activeId}
+            projectId={activeProject?.id ?? null}
+            token={authToken}
+            onSelect={id => { setActiveId(id); setSelectedImage(null) }}
+          />
+        </div>
       </div>
 
       {showSettings && activeProject && authToken && (
