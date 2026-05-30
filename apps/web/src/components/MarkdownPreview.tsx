@@ -5,7 +5,8 @@ import * as Y from 'yjs'
 import type { Awareness } from 'y-protocols/awareness'
 import type { ImageMeta } from '@websidian/shared'
 
-const WIKILINK_RE = /\[\[([^\]\n]+)\]\]/g
+// Group 1: target (path or title); Group 2: optional alias/display text
+const WIKILINK_RE = /\[\[([^\]\n|]+?)(?:\|([^\]\n]+))?\]\]/g
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|avif)$/i
 
 interface Props {
@@ -27,34 +28,39 @@ function parseWikilinks(
   WIKILINK_RE.lastIndex = 0
   let match: RegExpExecArray | null
   while ((match = WIKILINK_RE.exec(text)) !== null) {
-    const title = match[1]
+    const target = match[1]
+    const alias = match[2] ?? null
     const isEmbed = match.index > 0 && text[match.index - 1] === '!'
     const startIdx = isEmbed ? match.index - 1 : match.index
 
     if (startIdx > last) parts.push(text.slice(last, startIdx))
 
-    if (isEmbed && IMAGE_EXT_RE.test(title)) {
-      const img = imagesByName.get(title)
+    if (isEmbed && IMAGE_EXT_RE.test(target)) {
+      const img = imagesByName.get(target)
       if (img) {
         parts.push(
           <img
             key={`img-${baseKey}-${count++}`}
             src={`/api/projects/${img.projectId}/images/${img.id}`}
-            alt={title}
+            alt={alias ?? target}
             style={{ maxWidth: '100%', borderRadius: 4, display: 'block', margin: '0.5em 0' }}
           />
         )
       } else {
-        parts.push(`![[${title}]]`)
+        parts.push(`![[${target}${alias ? `|${alias}` : ''}]]`)
       }
     } else {
+      // Show alias if provided, otherwise show [[target]]
+      const displayText = isEmbed
+        ? `![[${target}${alias ? `|${alias}` : ''}]]`
+        : (alias ?? `[[${target}]]`)
       parts.push(
         <span
           key={`wl-${baseKey}-${count++}`}
-          onClick={() => onClick(title)}
+          onClick={() => onClick(target)}
           style={{ color: '#89b4fa', cursor: 'pointer', textDecoration: 'underline dotted' }}
         >
-          {isEmbed ? `![[${title}]]` : `[[${title}]]`}
+          {displayText}
         </span>
       )
     }

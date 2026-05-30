@@ -158,19 +158,41 @@ export default function App() {
   const canEdit = userRole === 'owner' || userRole === 'admin' || userRole === 'editor'
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin'
 
-  const handleWikilinkClick = useCallback((title: string) => {
-    const existing = notes.find(n => n.title === title)
+  const handleWikilinkClick = useCallback((target: string) => {
+    // Build id→note map for path resolution
+    const idToNote = new Map(notes.map(n => [n.id, n]))
+    const getFullPath = (note: typeof notes[0]): string => {
+      const segments: string[] = [note.title]
+      let cur = note
+      while (cur.parentId) {
+        const parent = idToNote.get(cur.parentId)
+        if (!parent) break
+        segments.unshift(parent.title)
+        cur = parent
+      }
+      return segments.join('/')
+    }
+
+    // Path-qualified lookup first (e.g. "Folder/Note")
+    let existing = target.includes('/')
+      ? notes.find(n => !n.isFolder && getFullPath(n) === target)
+      : undefined
+    // Fall back to title lookup
+    if (!existing) existing = notes.find(n => !n.isFolder && n.title === target)
+
     if (existing) {
       setActiveId(existing.id)
+      setSelectedImage(null)
     } else if (canEdit && activeProject) {
-      // create note then navigate to it
+      // Derive title from the last path segment for new-note creation
+      const newTitle = target.includes('/') ? target.split('/').pop()! : target
       fetch(`${API}/api/projects/${activeProject.id}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({ path: `${title}.md`, title }),
+        body: JSON.stringify({ title: newTitle }),
       })
         .then(r => r.ok ? r.json() : null)
-        .then(n => { if (n?.id) setActiveId(n.id) })
+        .then(n => { if (n?.id) { setActiveId(n.id); setSelectedImage(null) } })
         .catch(() => {})
     }
   }, [notes, canEdit, activeProject, authToken])
