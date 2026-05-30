@@ -22,12 +22,15 @@ export default function NewProjectModal({ token, onCreated, onClose }: Props) {
   const [imagesTotal, setImagesTotal] = useState(0)
   const [imagesDone, setImagesDone] = useState(0)
 
-  const supportsFilePicker = typeof window !== 'undefined' && 'showDirectoryPicker' in window
-
   const handlePickVault = async () => {
+    if (!('showDirectoryPicker' in window)) {
+      setErrorMsg('Your browser does not support folder selection. Use Chrome or Edge.')
+      return
+    }
     try {
       const handle = await (window as any).showDirectoryPicker({ mode: 'read' })
       setVaultHandle(handle)
+      setErrorMsg('')
     } catch {
       // User cancelled or permission denied — do nothing
     }
@@ -135,23 +138,21 @@ export default function NewProjectModal({ token, onCreated, onClose }: Props) {
               />
             </div>
 
-            {supportsFilePicker && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, color: '#6c7086', marginBottom: 6 }}>
-                  Import from Obsidian vault (optional)
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <button onClick={handlePickVault} style={btnSecondary}>
-                    Choose folder
-                  </button>
-                  {vaultHandle && (
-                    <span style={{ fontSize: 12, color: '#a6e3a1' }}>
-                      📁 {vaultHandle.name}
-                    </span>
-                  )}
-                </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, color: '#6c7086', marginBottom: 6 }}>
+                Import from Obsidian vault (optional)
               </div>
-            )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button onClick={handlePickVault} style={btnSecondary}>
+                  Choose folder
+                </button>
+                {vaultHandle && (
+                  <span style={{ fontSize: 12, color: '#a6e3a1' }}>
+                    📁 {vaultHandle.name}
+                  </span>
+                )}
+              </div>
+            </div>
 
             {step === 'error' && (
               <div style={{ color: '#f38ba8', fontSize: 12, marginBottom: 12 }}>{errorMsg}</div>
