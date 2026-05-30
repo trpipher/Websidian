@@ -109,11 +109,12 @@ interface Props {
   onRename: (id: string, title: string) => void
   onDelete: (id: string) => void
   onMove: (id: string, parentId: string | null) => void
+  onUploadImage: (file: File) => Promise<import('@websidian/shared').ImageMeta | null>
 }
 
 export default function Sidebar({
   notes, activeId, canEdit,
-  onSelect, onNewNote, onNewFolder, onRename, onDelete, onMove,
+  onSelect, onNewNote, onNewFolder, onRename, onDelete, onMove, onUploadImage,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [draggingId, setDraggingId] = useState<string | null>(null)
@@ -126,6 +127,8 @@ export default function Sidebar({
   const [sortAnchorRect, setSortAnchorRect] = useState<DOMRect | null>(null)
   const sortButtonRef = useRef<HTMLButtonElement>(null)
   const sortMenuJustClosed = useRef(false)
+  const [copiedImage, setCopiedImage] = useState(false)
+  const imageInputRef = useRef<HTMLInputElement>(null)
 
   // Auto-expand ancestors of the active note
   useEffect(() => {
@@ -163,6 +166,18 @@ export default function Sidebar({
     setTimeout(() => { sortMenuJustClosed.current = false }, 0)
     sortButtonRef.current?.focus()
   }, [])
+
+  const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    const image = await onUploadImage(file)
+    if (image) {
+      await navigator.clipboard.writeText(`![[${image.filename}]]`)
+      setCopiedImage(true)
+      setTimeout(() => setCopiedImage(false), 2000)
+    }
+  }, [onUploadImage])
 
   const handleSortButtonClick = useCallback(() => {
     if (sortMenuJustClosed.current) return
@@ -291,20 +306,40 @@ export default function Sidebar({
         </button>
       </div>
       {canEdit && (
-        <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-          <button
-            onClick={() => onNewNote(null)}
-            style={{ flex: 1, padding: '3px 6px', background: '#313244', color: '#cdd6f4', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
-          >
-            + Note
-          </button>
-          <button
-            onClick={() => onNewFolder(null)}
-            style={{ flex: 1, padding: '3px 6px', background: '#313244', color: '#cdd6f4', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
-          >
-            + Folder
-          </button>
-        </div>
+        <>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+            <button
+              onClick={() => onNewNote(null)}
+              style={{ flex: 1, padding: '3px 6px', background: '#313244', color: '#cdd6f4', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+            >
+              + Note
+            </button>
+            <button
+              onClick={() => onNewFolder(null)}
+              style={{ flex: 1, padding: '3px 6px', background: '#313244', color: '#cdd6f4', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+            >
+              + Folder
+            </button>
+          </div>
+          <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button
+              onClick={() => imageInputRef.current?.click()}
+              style={{ padding: '3px 8px', background: '#313244', color: '#cdd6f4', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+            >
+              + Image
+            </button>
+            {copiedImage && (
+              <span style={{ fontSize: 11, color: '#a6e3a1' }}>Copied!</span>
+            )}
+          </div>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={handleImageUpload}
+          />
+        </>
       )}
 
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
