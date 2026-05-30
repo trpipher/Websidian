@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Editor from './components/Editor'
 import MarkdownPreview from './components/MarkdownPreview'
 import Sidebar from './components/Sidebar'
@@ -142,6 +142,34 @@ export default function App() {
     setActiveId(null)
     setSelectedImage(null)
   }, [activeProject?.id])
+
+  // Flag so the popstate handler can suppress the re-push that would happen when
+  // setActiveId is called in response to a back navigation
+  const isPopstateNav = useRef(false)
+
+  // Push a history entry for every note opened so back button can return to it
+  useEffect(() => {
+    if (!activeId || isPopstateNav.current) {
+      isPopstateNav.current = false
+      return
+    }
+    history.pushState({ wsNoteId: activeId }, '')
+  }, [activeId])
+
+  // Intercept browser / mouse back button — navigate to previous note if available,
+  // otherwise let the browser handle it (navigate away from the page)
+  useEffect(() => {
+    const onPopstate = (e: PopStateEvent) => {
+      const noteId = (e.state as { wsNoteId?: string } | null)?.wsNoteId
+      if (noteId) {
+        isPopstateNav.current = true
+        setActiveId(noteId)
+        setSelectedImage(null)
+      }
+    }
+    window.addEventListener('popstate', onPopstate)
+    return () => window.removeEventListener('popstate', onPopstate)
+  }, [])
 
   // Auto-select first note when notes load — guard ensures notes are from the current project
   useEffect(() => {
