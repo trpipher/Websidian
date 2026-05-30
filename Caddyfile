@@ -3,7 +3,8 @@
   # MCP endpoint — matched before the WS and API blocks
   reverse_proxy /mcp* mcp:3100
 
-  # REST API + auth routes
+  # OAuth server metadata + REST API + auth routes
+  reverse_proxy /.well-known/* sync:1235
   reverse_proxy /api/* sync:1235
   reverse_proxy /oauth/* sync:1235
 
