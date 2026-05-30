@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
+import { forceCollide } from 'd3-force'
 import type { NoteMeta, LinkEdge } from '@websidian/shared'
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:1235'
@@ -52,9 +53,12 @@ export default function NoteGraph({ notes, projectId, token, onSelect, onClose }
   useEffect(() => {
     const fg = fgRef.current
     if (!fg) return
-    fg.d3Force('charge')?.strength(-500).distanceMax(280)
-    fg.d3Force('link')?.distance(140).iterations(2)
+    fg.d3Force('charge')?.strength(-400).distanceMax(300)
+    fg.d3Force('link')?.distance(130).iterations(2)
     fg.d3Force('center')?.strength(0.05)
+    // Give every node a personal-space bubble so nodes can't overlap
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fg.d3Force('collide', forceCollide((node: any) => Math.sqrt((node.val ?? 1) * 4) + 4))
     fg.d3ReheatSimulation()
   }, [graphData])
 
