@@ -12,18 +12,25 @@ notesRouter.get('/', async (c) => {
   const userId = resolveUserId(c)
   if (!canReadProject(projectId, userId)) return c.json({ error: 'Not found' }, 404)
 
-  const notes = db.prepare(`
-    SELECT id, path, title, project_id as projectId,
-           created_at as createdAt, updated_at as updatedAt,
-           parent_id as parentId,
-           COALESCE(sort_order, rowid * 1000) as sortOrder,
-           COALESCE(is_folder, 0) as isFolder
-    FROM notes
-    WHERE project_id = ? AND deleted_at IS NULL
-    ORDER BY COALESCE(sort_order, rowid * 1000) ASC
-  `).all(projectId) as (Omit<NoteMeta, 'isFolder'> & { isFolder: number })[]
+  const rows = db.prepare(`
+    SELECT n.id, n.path, n.title, n.project_id as projectId,
+           n.created_at as createdAt, n.updated_at as updatedAt,
+           n.parent_id as parentId,
+           COALESCE(n.sort_order, n.rowid * 1000) as sortOrder,
+           COALESCE(n.is_folder, 0) as isFolder,
+           COALESCE(GROUP_CONCAT(a.alias, char(31)), '') as aliasesRaw
+    FROM notes n
+    LEFT JOIN note_aliases a ON a.note_id = n.id
+    WHERE n.project_id = ? AND n.deleted_at IS NULL
+    GROUP BY n.id
+    ORDER BY COALESCE(n.sort_order, n.rowid * 1000) ASC
+  `).all(projectId) as (Omit<NoteMeta, 'isFolder' | 'aliases'> & { isFolder: number; aliasesRaw: string })[]
 
-  return c.json(notes.map(n => ({ ...n, isFolder: Boolean(n.isFolder) })))
+  return c.json(rows.map(({ aliasesRaw, isFolder, ...n }) => ({
+    ...n,
+    isFolder: Boolean(isFolder),
+    aliases: aliasesRaw ? aliasesRaw.split('\x1F') : [],
+  })))
 })
 
 // ── Create note or folder ─────────────────────────────────────────────────────
@@ -58,24 +65,61 @@ notesRouter.post('/', requireProjectRole('editor'), async (c) => {
   } as NoteMeta, 201)
 })
 
-// ── FTS search ────────────────────────────────────────────────────────────────
+// ── FTS + tag + alias search ──────────────────────────────────────────────────
 notesRouter.get('/search', async (c) => {
   const projectId = c.req.param('projectId')!
   const userId = resolveUserId(c)
   if (!canReadProject(projectId, userId)) return c.json({ error: 'Not found' }, 404)
-  const q = c.req.query('q') ?? ''
+  const q = (c.req.query('q') ?? '').trim()
+  if (!q) return c.json([])
+
+  const ftsTerm = q.replace(/[^a-zA-Z0-9 ]/g, ' ').trim() + '*'
+  const likeTerm = `%${q}%`
+
   const rows = db.prepare(`
     SELECT n.id, n.path, n.title, n.project_id as projectId,
            n.created_at as createdAt, n.updated_at as updatedAt,
            n.parent_id as parentId,
            COALESCE(n.sort_order, n.rowid * 1000) as sortOrder,
-           COALESCE(n.is_folder, 0) as isFolder
+           COALESCE(n.is_folder, 0) as isFolder,
+           'fts' as matchType
     FROM notes_fts fts
     JOIN notes n ON n.rowid = fts.rowid
     WHERE notes_fts MATCH ? AND n.project_id = ? AND n.deleted_at IS NULL
-    ORDER BY rank LIMIT 20
-  `).all(q, projectId) as (Omit<NoteMeta, 'isFolder'> & { isFolder: number })[]
-  return c.json(rows.map(n => ({ ...n, isFolder: Boolean(n.isFolder) })))
+
+    UNION
+
+    SELECT n.id, n.path, n.title, n.project_id as projectId,
+           n.created_at as createdAt, n.updated_at as updatedAt,
+           n.parent_id as parentId,
+           COALESCE(n.sort_order, n.rowid * 1000) as sortOrder,
+           COALESCE(n.is_folder, 0) as isFolder,
+           'tag' as matchType
+    FROM notes n
+    JOIN note_tags t ON t.note_id = n.id
+    WHERE t.tag LIKE ? AND n.project_id = ? AND n.deleted_at IS NULL
+
+    UNION
+
+    SELECT n.id, n.path, n.title, n.project_id as projectId,
+           n.created_at as createdAt, n.updated_at as updatedAt,
+           n.parent_id as parentId,
+           COALESCE(n.sort_order, n.rowid * 1000) as sortOrder,
+           COALESCE(n.is_folder, 0) as isFolder,
+           'alias' as matchType
+    FROM notes n
+    JOIN note_aliases a ON a.note_id = n.id
+    WHERE a.alias LIKE ? AND n.project_id = ? AND n.deleted_at IS NULL
+
+    LIMIT 20
+  `).all(ftsTerm, projectId, likeTerm, projectId, likeTerm, projectId) as
+    (Omit<NoteMeta, 'isFolder' | 'aliases'> & { isFolder: number; matchType: string })[]
+
+  return c.json(rows.map(n => ({
+    ...n,
+    isFolder: Boolean(n.isFolder),
+    aliases: [] as string[],
+  })))
 })
 
 // ── Update note (rename, move, reorder) ───────────────────────────────────────
