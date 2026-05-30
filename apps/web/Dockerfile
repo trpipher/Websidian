@@ -8,7 +8,7 @@ ENV VITE_API_URL=${VITE_API_URL}
 ENV VITE_SYNC_URL=${VITE_SYNC_URL}
 
 WORKDIR /app
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY apps/web/ ./apps/web/
 
