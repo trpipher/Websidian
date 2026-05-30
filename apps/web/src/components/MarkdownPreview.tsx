@@ -195,8 +195,8 @@ export default function MarkdownPreview({ yText, awareness: _awareness, onWikili
           a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer" style={{ color: '#89b4fa' }}>{children}</a>,
           hr: () => <hr style={{ border: 'none', borderTop: '1px solid #313244', margin: '1.5em 0' }} />,
           table: ({ children }) => <table style={{ borderCollapse: 'collapse', marginBottom: '1em', width: '100%' }}>{children}</table>,
-          th: ({ children }) => <th style={{ border: '1px solid #313244', padding: '6px 12px', background: '#181825', textAlign: 'left' }}>{children}</th>,
-          td: ({ children }) => <td style={{ border: '1px solid #313244', padding: '6px 12px' }}>{children}</td>,
+          th: ({ children }) => <th style={{ border: '1px solid #313244', padding: '6px 12px', background: '#181825', textAlign: 'left' }}>{processChildren(children, onWikilinkClick, imagesByName)}</th>,
+          td: ({ children }) => <td style={{ border: '1px solid #313244', padding: '6px 12px' }}>{processChildren(children, onWikilinkClick, imagesByName)}</td>,
         }}
       >
         {content}
