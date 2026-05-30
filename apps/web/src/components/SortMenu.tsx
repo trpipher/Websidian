@@ -41,8 +41,8 @@ export default function SortMenu({ config, anchorRect, onChange, onClose }: Prop
     return () => document.removeEventListener('keydown', handler)
   }, [onClose])
 
-  // Position: below the anchor button, flush left; clamp if near right edge
-  const top = anchorRect.bottom + 4
+  // Position: below the anchor button, flush left; clamp right and bottom edges
+  const top = Math.min(anchorRect.bottom + 4, window.innerHeight - 120)
   const left = Math.min(anchorRect.left, window.innerWidth - 180)
 
   const handleSelect = (field: SortField) => {

@@ -152,6 +152,7 @@ export default function Sidebar({
     setShowSortMenu(false)
     sortMenuJustClosed.current = true
     setTimeout(() => { sortMenuJustClosed.current = false }, 0)
+    sortButtonRef.current?.focus()
   }, [])
 
   const handleSortButtonClick = useCallback(() => {
