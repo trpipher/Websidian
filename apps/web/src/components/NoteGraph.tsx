@@ -52,9 +52,9 @@ export default function NoteGraph({ notes, projectId, token, onSelect, onClose }
   useEffect(() => {
     const fg = fgRef.current
     if (!fg) return
-    fg.d3Force('charge')?.strength(-600).distanceMax(400)
-    fg.d3Force('link')?.distance(150).iterations(3)
-    fg.d3Force('center')?.strength(0.05)
+    fg.d3Force('charge')?.strength(-800)
+    fg.d3Force('link')?.distance(200).iterations(1)
+    fg.d3Force('center')?.strength(0.02)
     fg.d3ReheatSimulation()
   }, [graphData])
 
