@@ -9,20 +9,61 @@ import {
   type DragStartEvent,
   type DragOverEvent,
 } from '@dnd-kit/core'
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { SortableContext } from '@dnd-kit/sortable'
 import type { NoteMeta } from '@websidian/shared'
 import SidebarItem from './SidebarItem'
+import SortMenu, { type SortConfig } from './SortMenu'
+
+const SORT_STORAGE_KEY = 'ws-sort-config'
+const DEFAULT_SORT: SortConfig = { by: 'title', direction: 'asc' }
+
+function loadSortConfig(): SortConfig {
+  try {
+    const raw = localStorage.getItem(SORT_STORAGE_KEY)
+    if (!raw) return DEFAULT_SORT
+    const parsed = JSON.parse(raw) as Partial<SortConfig>
+    const validFields = ['title', 'createdAt', 'updatedAt']
+    const validDirs = ['asc', 'desc']
+    if (validFields.includes(parsed.by ?? '') && validDirs.includes(parsed.direction ?? '')) {
+      return parsed as SortConfig
+    }
+  } catch { /* ignore */ }
+  return DEFAULT_SORT
+}
+
+function sortNotes(items: NoteMeta[], config: SortConfig): NoteMeta[] {
+  const folders = items.filter(n => n.isFolder)
+  const notes = items.filter(n => !n.isFolder)
+
+  const compare = (a: NoteMeta, b: NoteMeta): number => {
+    if (config.by === 'title') {
+      return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })
+    }
+    const aVal = config.by === 'createdAt' ? a.createdAt : a.updatedAt
+    const bVal = config.by === 'createdAt' ? b.createdAt : b.updatedAt
+    return aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+  }
+
+  const sortedFolders = [...folders].sort(compare)
+  const sortedNotes = [...notes].sort(compare)
+
+  if (config.direction === 'desc') {
+    sortedFolders.reverse()
+    sortedNotes.reverse()
+  }
+
+  return [...sortedFolders, ...sortedNotes]
+}
 
 interface NoteNode extends NoteMeta {
   children: NoteNode[]
   depth: number
 }
 
-function buildTree(notes: NoteMeta[], parentId: string | null = null, depth = 0): NoteNode[] {
-  return notes
-    .filter(n => (n.parentId ?? null) === parentId)
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map(n => ({ ...n, depth, children: buildTree(notes, n.id, depth + 1) }))
+function buildTree(notes: NoteMeta[], config: SortConfig, parentId: string | null = null, depth = 0): NoteNode[] {
+  const children = notes.filter(n => (n.parentId ?? null) === parentId)
+  const sorted = sortNotes(children, config)
+  return sorted.map(n => ({ ...n, depth, children: buildTree(notes, config, n.id, depth + 1) }))
 }
 
 function flattenVisible(nodes: NoteNode[], expanded: Set<string>): NoteNode[] {
@@ -60,7 +101,7 @@ interface Props {
   onNewFolder: (parentId?: string | null) => void
   onRename: (id: string, title: string) => void
   onDelete: (id: string) => void
-  onMove: (id: string, parentId: string | null, sortOrder: number) => void
+  onMove: (id: string, parentId: string | null) => void
 }
 
 export default function Sidebar({
@@ -71,6 +112,10 @@ export default function Sidebar({
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [overFolderId, setOverFolderId] = useState<string | null>(null)
   const overFolderTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [sortConfig, setSortConfig] = useState<SortConfig>(loadSortConfig)
+  const [showSortMenu, setShowSortMenu] = useState(false)
+  const [sortAnchorRect, setSortAnchorRect] = useState<DOMRect | null>(null)
+  const sortButtonRef = useRef<HTMLButtonElement>(null)
 
   // Auto-expand ancestors of the active note
   useEffect(() => {
@@ -97,9 +142,23 @@ export default function Sidebar({
     onDelete(id)
   }, [notes, onDelete])
 
+  const handleSortChange = useCallback((config: SortConfig) => {
+    setSortConfig(config)
+    localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(config))
+  }, [])
+
+  const handleSortButtonClick = () => {
+    if (showSortMenu) {
+      setShowSortMenu(false)
+    } else {
+      setSortAnchorRect(sortButtonRef.current?.getBoundingClientRect() ?? null)
+      setShowSortMenu(true)
+    }
+  }
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
-  const tree = buildTree(notes)
+  const tree = buildTree(notes, sortConfig)
   const visible = flattenVisible(tree, expanded)
   const visibleIds = visible.map(n => n.id)
 
@@ -149,23 +208,9 @@ export default function Sidebar({
       if (desc.has(overId)) return
     }
 
+    // Only support drop INTO a folder (hover-to-expand, then release)
     if (overNote.isFolder && overFolderId === overId) {
-      // Drop INTO folder — place as last child
-      const siblings = notes.filter(n => n.parentId === overId)
-      const newSortOrder = siblings.length > 0
-        ? Math.max(...siblings.map(n => n.sortOrder)) + 1000
-        : 1000
-      onMove(draggedId, overId, newSortOrder)
-    } else {
-      // Reorder within same parent level
-      const siblings = notes
-        .filter(n => (n.parentId ?? null) === (overNote.parentId ?? null))
-        .sort((a, b) => a.sortOrder - b.sortOrder)
-      const overIdx = siblings.findIndex(n => n.id === overId)
-      const prev = siblings[overIdx - 1]?.sortOrder ?? 0
-      const next = siblings[overIdx]?.sortOrder ?? prev + 2000
-      const newSortOrder = (prev + next) / 2
-      onMove(draggedId, overNote.parentId ?? null, newSortOrder)
+      onMove(draggedId, overId)
     }
   }
 
@@ -173,8 +218,24 @@ export default function Sidebar({
 
   return (
     <aside style={{ padding: 8, color: '#cdd6f4', flex: 1, overflowY: 'auto', minHeight: 0 }}>
-      <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 13, color: '#6c7086', padding: '0 4px' }}>
-        Notes
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8, padding: '0 4px' }}>
+        <span style={{ fontWeight: 700, fontSize: 13, color: '#6c7086', flex: 1 }}>Notes</span>
+        <button
+          ref={sortButtonRef}
+          onClick={handleSortButtonClick}
+          title="Sort notes"
+          style={{
+            background: 'none',
+            border: 'none',
+            color: showSortMenu ? '#89b4fa' : '#6c7086',
+            cursor: 'pointer',
+            fontSize: 14,
+            padding: '1px 4px',
+            lineHeight: 1,
+          }}
+        >
+          ⇅
+        </button>
       </div>
       {canEdit && (
         <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
@@ -194,7 +255,7 @@ export default function Sidebar({
       )}
 
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
-        <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
+        <SortableContext items={visibleIds}>
           {visible.map(note => (
             <SidebarItem
               key={note.id}
@@ -230,6 +291,15 @@ export default function Sidebar({
           )}
         </DragOverlay>
       </DndContext>
+
+      {showSortMenu && sortAnchorRect && (
+        <SortMenu
+          config={sortConfig}
+          anchorRect={sortAnchorRect}
+          onChange={handleSortChange}
+          onClose={() => setShowSortMenu(false)}
+        />
+      )}
     </aside>
   )
 }
