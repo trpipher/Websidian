@@ -55,6 +55,13 @@ function sortNotes(items: NoteMeta[], config: SortConfig): NoteMeta[] {
   return [...sortedFolders, ...sortedNotes]
 }
 
+// Zone = folder to drop into (null = root). Derived purely from the over item.
+function computeDropZone(overId: string, notes: NoteMeta[]): string | null {
+  const over = notes.find(n => n.id === overId)
+  if (!over) return null
+  return over.isFolder ? overId : (over.parentId ?? null)
+}
+
 interface NoteNode extends NoteMeta {
   children: NoteNode[]
   depth: number
@@ -110,8 +117,9 @@ export default function Sidebar({
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [draggingId, setDraggingId] = useState<string | null>(null)
-  const [overFolderId, setOverFolderId] = useState<string | null>(null)
-  const overFolderIdRef = useRef<string | null>(null)
+  // undefined = not dragging; null = root zone; string = folder zone
+  const [dropZone, setDropZone] = useState<string | null | undefined>(undefined)
+  const lastDropZoneRef = useRef<string | null | undefined>(undefined)
   const overFolderTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [sortConfig, setSortConfig] = useState<SortConfig>(loadSortConfig)
   const [showSortMenu, setShowSortMenu] = useState(false)
@@ -174,62 +182,53 @@ export default function Sidebar({
 
   const onDragOver = ({ over }: DragOverEvent) => {
     if (!over) {
-      if (overFolderTimer.current) clearTimeout(overFolderTimer.current)
-      overFolderTimer.current = null
-      setOverFolderId(null)
-      overFolderIdRef.current = null
+      if (overFolderTimer.current) { clearTimeout(overFolderTimer.current); overFolderTimer.current = null }
+      setDropZone(undefined)
+      lastDropZoneRef.current = undefined
       return
     }
-    const overNote = notes.find(n => n.id === over.id)
-    if (overNote?.isFolder && over.id !== overFolderIdRef.current) {
-      if (overFolderTimer.current) clearTimeout(overFolderTimer.current)
-      overFolderTimer.current = setTimeout(() => {
-        const fid = over.id as string
-        setOverFolderId(fid)
-        overFolderIdRef.current = fid
-        setExpanded(prev => new Set([...prev, fid]))
-      }, 600)
-    } else if (!overNote?.isFolder) {
-      // Don't clear if hovering over a child of the currently tracked folder —
-      // dnd-kit shifts `over` to children after auto-expand, which would cancel the drop
-      const ancestors = getAncestorIds(notes, over.id as string)
-      if (!overFolderIdRef.current || !ancestors.has(overFolderIdRef.current)) {
-        if (overFolderTimer.current) clearTimeout(overFolderTimer.current)
-        overFolderTimer.current = null
-        setOverFolderId(null)
-        overFolderIdRef.current = null
+    const newZone = computeDropZone(over.id as string, notes)
+    if (newZone !== lastDropZoneRef.current) {
+      if (overFolderTimer.current) { clearTimeout(overFolderTimer.current); overFolderTimer.current = null }
+      setDropZone(newZone)
+      lastDropZoneRef.current = newZone
+      // Auto-expand collapsed folder target after a short delay
+      if (newZone !== null && !expanded.has(newZone)) {
+        overFolderTimer.current = setTimeout(() => {
+          setExpanded(prev => new Set([...prev, newZone]))
+          overFolderTimer.current = null
+        }, 600)
       }
     }
   }
 
   const onDragEnd = ({ active, over }: DragEndEvent) => {
-    // Capture before clearing — state may be stale in closure if onDragOver cleared it
-    const targetFolderId = overFolderIdRef.current
     setDraggingId(null)
-    setOverFolderId(null)
-    overFolderIdRef.current = null
-    if (overFolderTimer.current) clearTimeout(overFolderTimer.current)
-    overFolderTimer.current = null
+    setDropZone(undefined)
+    lastDropZoneRef.current = undefined
+    if (overFolderTimer.current) { clearTimeout(overFolderTimer.current); overFolderTimer.current = null }
 
-    if (!over || active.id === over.id || !targetFolderId) return
+    if (!over || active.id === over.id) return
 
     const draggedId = active.id as string
     const dragged = notes.find(n => n.id === draggedId)
     if (!dragged) return
 
+    const targetId = computeDropZone(over.id as string, notes)
+
     // Prevent moving folder into its own descendant
-    if (dragged.isFolder) {
+    if (dragged.isFolder && targetId !== null) {
       const desc = new Set<string>()
       const collectDesc = (id: string) => {
-        for (const n of notes) {
-          if (n.parentId === id) { desc.add(n.id); collectDesc(n.id) }
-        }
+        for (const n of notes) { if (n.parentId === id) { desc.add(n.id); collectDesc(n.id) } }
       }
       collectDesc(draggedId)
-      if (desc.has(targetFolderId)) return
+      if (desc.has(targetId)) return
     }
 
-    onMove(draggedId, targetFolderId)
+    if ((dragged.parentId ?? null) === targetId) return  // already there
+
+    onMove(draggedId, targetId)
   }
 
   const draggingNote = draggingId ? notes.find(n => n.id === draggingId) : null
@@ -277,7 +276,14 @@ export default function Sidebar({
 
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
         <SortableContext items={visibleIds}>
-          {visible.map(note => (
+          {visible.map(note => {
+            const inZone = dropZone !== undefined && (
+              dropZone === null
+                ? (note.parentId ?? null) === null
+                : note.id === dropZone || getAncestorIds(notes, note.id).has(dropZone)
+            )
+            const isTarget = typeof dropZone === 'string' && note.id === dropZone
+            return (
             <SidebarItem
               key={note.id}
               note={note}
@@ -285,6 +291,8 @@ export default function Sidebar({
               isActive={note.id === activeId}
               isExpanded={expanded.has(note.id)}
               canEdit={canEdit}
+              isInDragZone={inZone}
+              isDragTarget={isTarget}
               onSelect={onSelect}
               onToggle={toggle}
               onRename={onRename}
@@ -293,7 +301,7 @@ export default function Sidebar({
               onNewFolder={onNewFolder}
               childCount={countDescendants(notes, note.id)}
             />
-          ))}
+          )})}
         </SortableContext>
 
         <DragOverlay>

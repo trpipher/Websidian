@@ -10,6 +10,8 @@ interface Props {
   isActive: boolean
   isExpanded: boolean
   canEdit: boolean
+  isInDragZone: boolean
+  isDragTarget: boolean
   onSelect: (id: string) => void
   onToggle: (id: string) => void
   onRename: (id: string, title: string) => void
@@ -20,7 +22,7 @@ interface Props {
 }
 
 export default function SidebarItem({
-  note, depth, isActive, isExpanded, canEdit,
+  note, depth, isActive, isExpanded, canEdit, isInDragZone, isDragTarget,
   onSelect, onToggle, onRename, onDelete, onNewNote, onNewFolder, childCount,
 }: Props) {
   const [isRenaming, setIsRenaming] = useState(false)
@@ -79,7 +81,14 @@ export default function SidebarItem({
           paddingLeft: 8 + depth * 16,
           borderRadius: 4,
           cursor: 'pointer',
-          background: isActive ? '#313244' : 'transparent',
+          background: isDragTarget
+            ? 'rgba(137, 180, 250, 0.22)'
+            : isInDragZone
+              ? 'rgba(137, 180, 250, 0.07)'
+              : isActive
+                ? '#313244'
+                : 'transparent',
+          boxShadow: isDragTarget ? 'inset 2px 0 0 #89b4fa' : undefined,
           marginBottom: 1,
           fontSize: 13,
           color: '#cdd6f4',
