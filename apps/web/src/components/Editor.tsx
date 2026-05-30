@@ -38,6 +38,11 @@ export default function Editor({ yText, awareness, onWikilinkClick }: Props) {
     viewRef.current = view
 
     return () => {
+      // @codemirror/lang-markdown schedules requestIdleCallbacks for async parsing.
+      // Those callbacks can fire after view.destroy(), which throws because
+      // updateState === Destroyed !== Idle. Silence them with a no-op dispatch.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(view as any).dispatch = () => {}
       view.destroy()
       viewRef.current = null
       undoManager.destroy()
