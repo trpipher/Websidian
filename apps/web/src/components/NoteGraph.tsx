@@ -54,11 +54,11 @@ export default function NoteGraph({ notes, projectId, token, onSelect, onClose }
     const fg = fgRef.current
     if (!fg) return
     fg.d3Force('charge')?.strength(-400).distanceMax(300)
-    fg.d3Force('link')?.distance(130).iterations(2)
+    fg.d3Force('link')?.distance(120).iterations(1).strength(0.25)
     fg.d3Force('center')?.strength(0.05)
     // Give every node a personal-space bubble so nodes can't overlap
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    fg.d3Force('collide', forceCollide((node: any) => Math.sqrt((node.val ?? 1) * 4) + 4))
+    fg.d3Force('collide', forceCollide((node: any) => Math.sqrt((node.val ?? 1) * 4) + 10))
     fg.d3ReheatSimulation()
   }, [graphData])
 
