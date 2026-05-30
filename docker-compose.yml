@@ -40,8 +40,8 @@ services:
 
   caddy:
     image: caddy:2-alpine
-    ports:
-      - "80:80"
+    expose:
+      - 80
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
@@ -50,9 +50,12 @@ services:
       - web
     networks:
       - internal
+      - proxy_network
 
 volumes:
   sync_data:
 
 networks:
   internal:
+  proxy_network:
+    external: true
