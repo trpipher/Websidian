@@ -1,4 +1,5 @@
-your-domain.com {
+# Caddy runs as a plain HTTP proxy behind nginx proxy manager (which handles TLS)
+:80 {
   # MCP endpoint — matched before the WS and API blocks
   reverse_proxy /mcp* mcp:3100
 
