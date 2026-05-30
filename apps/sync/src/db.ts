@@ -67,3 +67,22 @@ if (!noteColNames.has('is_folder')) {
   db.exec('ALTER TABLE notes ADD COLUMN is_folder INTEGER NOT NULL DEFAULT 0')
   console.log('[db] added is_folder column to notes')
 }
+
+// Create images table if not present
+const imageTableExists = db.prepare(
+  "SELECT name FROM sqlite_master WHERE type='table' AND name='images'"
+).get()
+if (!imageTableExists) {
+  db.exec(`
+    CREATE TABLE images (
+      id          TEXT NOT NULL PRIMARY KEY,
+      project_id  TEXT NOT NULL REFERENCES projects(id),
+      filename    TEXT NOT NULL,
+      mimetype    TEXT NOT NULL,
+      size        INTEGER NOT NULL,
+      uploaded_by TEXT NOT NULL REFERENCES "user"(id),
+      created_at  TEXT NOT NULL
+    )
+  `)
+  console.log('[db] created images table')
+}
