@@ -80,7 +80,8 @@ function unauthorized(res: ServerResponse, mcpUrl: string): void {
 
 const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
   // Protected Resource Metadata — public, no auth
-  if (req.url === '/.well-known/oauth-protected-resource') {
+  // Handle both /.well-known/... and /mcp/.well-known/... (Caddy forwards full path)
+  if (req.url?.endsWith('/.well-known/oauth-protected-resource')) {
     res.writeHead(200, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({
       resource: MCP_URL,
