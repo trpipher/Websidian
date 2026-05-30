@@ -191,8 +191,9 @@ export default function App() {
         <ProjectSwitcher
           projects={projects}
           activeProject={activeProject}
+          token={authToken}
           onSelect={p => { setActiveProject(p); setActiveId(null); setPreviewMode(true) }}
-          onCreate={createProject}
+          onRefreshProjects={refreshProjects}
         />
 
         {isOwnerOrAdmin && activeProject && (
