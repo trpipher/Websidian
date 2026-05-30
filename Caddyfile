@@ -13,7 +13,6 @@ your-domain.com {
   }
   reverse_proxy @ws sync:1234
 
-  # Static web app (built output from apps/web/dist/)
-  root * /srv/web
-  file_server
+  # Web app (served by nginx inside the web container)
+  reverse_proxy web:80
 }

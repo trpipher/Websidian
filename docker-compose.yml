@@ -29,6 +29,15 @@ services:
     networks:
       - internal
 
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        - DOMAIN=${DOMAIN}
+    networks:
+      - internal
+
   caddy:
     image: caddy:2-alpine
     ports:
@@ -36,12 +45,12 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./apps/web/dist:/srv/web:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
       - sync
       - mcp
+      - web
     networks:
       - internal
 
