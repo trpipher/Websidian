@@ -8,11 +8,13 @@ COPY apps/mcp/ ./apps/mcp/
 
 RUN pnpm install --frozen-lockfile --filter @websidian/mcp...
 RUN pnpm --filter @websidian/mcp build
+# pnpm deploy creates a flat, symlink-free node_modules safe for Docker
+RUN pnpm deploy --filter @websidian/mcp --prod /deploy/mcp
 
 FROM node:24-alpine
 WORKDIR /app
+COPY --from=base /deploy/mcp/node_modules ./node_modules
 COPY --from=base /app/apps/mcp/dist ./dist
-COPY --from=base /app/node_modules ./node_modules
 
 ENV NODE_ENV=production
 EXPOSE 3100
