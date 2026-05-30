@@ -87,7 +87,7 @@ function parseWikilinks(
       // Show alias if provided, otherwise show [[target]]
       const displayText = isEmbed
         ? `![[${target}${alias ? `|${alias}` : ''}]]`
-        : (alias ?? `[[${target}]]`)
+        : (alias ?? target)
       parts.push(
         <span
           key={`wl-${baseKey}-${count++}`}
