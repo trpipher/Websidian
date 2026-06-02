@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:1235'
 
@@ -20,7 +22,6 @@ export default function LoginPage({ onLogin }: Props) {
     const endpoint = mode === 'signin'
       ? '/api/auth/sign-in/email'
       : '/api/auth/sign-up/email'
-
     try {
       const res = await fetch(`${API}${endpoint}`, {
         method: 'POST',
@@ -28,13 +29,7 @@ export default function LoginPage({ onLogin }: Props) {
         body: JSON.stringify({ email, password, name: name || email }),
         credentials: 'include',
       })
-
-      if (!res.ok) {
-        const body = await res.text()
-        setError(body || 'Something went wrong')
-        return
-      }
-
+      if (!res.ok) { setError((await res.text()) || 'Something went wrong'); return }
       const data = await res.json()
       const token = data.token ?? data.session?.token
       if (!token) { setError('Auth succeeded but no token received'); return }
@@ -61,64 +56,74 @@ export default function LoginPage({ onLogin }: Props) {
         credentials: 'include',
       })
       const data = await res.json()
-      if (data?.url) {
-        window.location.href = data.url
-      } else {
-        setError('Discord sign-in failed — no redirect URL returned')
-        setLoading(false)
-      }
+      if (data?.url) { window.location.href = data.url }
+      else { setError('Discord sign-in failed — no redirect URL returned'); setLoading(false) }
     } catch {
       setError('Network error — is the sync server running?')
       setLoading(false)
     }
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '8px 10px', marginBottom: 8,
-    background: '#313244', border: 'none', borderRadius: 4,
-    color: '#cdd6f4', fontSize: 14, boxSizing: 'border-box',
-  }
-
-  const btnStyle: React.CSSProperties = {
-    width: '100%', padding: '8px 0',
-    border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 700,
-  }
-
   return (
-    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e1e2e' }}>
-      <div style={{ background: '#181825', padding: 32, borderRadius: 8, width: 320, color: '#cdd6f4' }}>
-        <h2 style={{ marginTop: 0, marginBottom: 24 }}>Websidian</h2>
+    <div className="h-screen flex items-center justify-center bg-background">
+      <div className="bg-[#181825] p-8 rounded-lg w-80 text-foreground">
+        <h2 className="mt-0 mb-6 text-xl font-bold">Websidian</h2>
 
-        <button
+        <Button
           onClick={signInWithDiscord}
-          style={{ ...btnStyle, background: '#5865F2', color: '#fff', marginBottom: 16, opacity: loading ? 0.6 : 1 }}
+          disabled={loading}
+          className="w-full mb-4 bg-[#5865F2] hover:bg-[#4752c4] text-white font-bold"
         >
           Sign in with Discord
-        </button>
+        </Button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{ flex: 1, height: 1, background: '#313244' }} />
-          <span style={{ color: '#6c7086', fontSize: 12 }}>or</span>
-          <div style={{ flex: 1, height: 1, background: '#313244' }} />
+        <div className="flex items-center gap-2 mb-4">
+          <div className="flex-1 h-px bg-border" />
+          <span className="text-muted-foreground text-xs">or</span>
+          <div className="flex-1 h-px bg-border" />
         </div>
 
         {mode === 'signup' && (
-          <input placeholder="Display name" value={name} onChange={(e) => setName(e.target.value)}
-            style={inputStyle} onKeyDown={(e) => e.key === 'Enter' && submit()} />
+          <Input
+            placeholder="Display name"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && submit()}
+            className="mb-2"
+          />
         )}
-        <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)}
-          style={inputStyle} type="email" onKeyDown={(e) => e.key === 'Enter' && submit()} />
-        <input placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)}
-          style={inputStyle} type="password" onKeyDown={(e) => e.key === 'Enter' && submit()} />
-        {error && <div style={{ color: '#f38ba8', fontSize: 12, marginBottom: 8 }}>{error}</div>}
-        <button onClick={submit} disabled={loading}
-          style={{ ...btnStyle, background: '#89b4fa', color: '#1e1e2e', opacity: loading ? 0.6 : 1 }}>
+        <Input
+          placeholder="Email"
+          type="email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && submit()}
+          className="mb-2"
+        />
+        <Input
+          placeholder="Password"
+          type="password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && submit()}
+          className="mb-2"
+        />
+        {error && <p className="text-destructive text-xs mb-2">{error}</p>}
+
+        <Button
+          onClick={submit}
+          disabled={loading}
+          className="w-full bg-primary text-primary-foreground font-bold"
+        >
           {loading ? '…' : mode === 'signin' ? 'Sign In' : 'Sign Up'}
-        </button>
-        <button onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError('') }}
-          style={{ ...btnStyle, background: 'transparent', color: '#89b4fa', marginTop: 8 }}>
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError('') }}
+          className="w-full mt-2 text-primary"
+        >
           {mode === 'signin' ? 'Create account' : 'Already have an account'}
-        </button>
+        </Button>
       </div>
     </div>
   )
