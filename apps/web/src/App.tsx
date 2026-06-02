@@ -103,7 +103,7 @@ export default function App() {
 
   const [activeId, setActiveId] = useState<string | null>(null)
   const [selectedImage, setSelectedImage] = useState<ImageMeta | null>(null)
-  const { notes, createNote, renameNote, deleteNote, moveNote } = useNotes(activeProject?.id ?? null, authToken)
+  const { notes, createNote, renameNote, deleteNote, moveNote, importNotes } = useNotes(activeProject?.id ?? null, authToken)
   const { images, uploadImage, renameImage } = useImages(activeProject?.id ?? null, authToken)
   const { yText, synced, awareness } = useProvider(activeId, authToken)
 
@@ -254,6 +254,7 @@ export default function App() {
               onDelete={id => { deleteNote(id); if (activeId === id) setActiveId(null) }}
               onMove={(id, parentId) => moveNote(id, parentId)}
               onUploadImage={uploadImage}
+              onImportNotes={importNotes}
               images={images}
               selectedImageId={selectedImage?.id ?? null}
               onSelectImage={img => { setSelectedImage(img); setActiveId(null) }}

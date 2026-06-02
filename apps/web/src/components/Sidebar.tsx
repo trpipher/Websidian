@@ -17,6 +17,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -25,7 +26,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
-import { Image as ImageIcon } from 'lucide-react'
+import { Image as ImageIcon, ChevronDown } from 'lucide-react'
 
 // ── Sort types (previously in SortMenu.tsx) ───────────────────────────────────
 export type SortField = 'title' | 'createdAt' | 'updatedAt'
@@ -117,6 +118,7 @@ interface Props {
   onDelete: (id: string) => void
   onMove: (id: string, parentId: string | null) => void
   onUploadImage: (file: File) => Promise<ImageMeta | null>
+  onImportNotes: (files: FileList) => Promise<number>
   images: ImageMeta[]
   selectedImageId: string | null
   onSelectImage: (image: ImageMeta) => void
@@ -125,7 +127,7 @@ interface Props {
 
 export default function Sidebar({
   notes, activeId, canEdit,
-  onSelect, onNewNote, onNewFolder, onRename, onDelete, onMove, onUploadImage,
+  onSelect, onNewNote, onNewFolder, onRename, onDelete, onMove, onUploadImage, onImportNotes,
   images, selectedImageId, onSelectImage, onRenameImage,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -135,7 +137,9 @@ export default function Sidebar({
   const overFolderTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [sortConfig, setSortConfig] = useState<SortConfig>(loadSortConfig)
   const [copiedImage, setCopiedImage] = useState(false)
+  const [importedCount, setImportedCount] = useState<number | null>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const notesInputRef = useRef<HTMLInputElement>(null)
   const [renamingImageId, setRenamingImageId] = useState<string | null>(null)
   const [imageRenameValue, setImageRenameValue] = useState('')
   const imageRenameInputRef = useRef<HTMLInputElement>(null)
@@ -294,15 +298,54 @@ export default function Sidebar({
       {/* Action buttons */}
       {canEdit && (
         <>
-          <div className="flex gap-1 mb-1">
-            <button onClick={() => onNewNote(null)} className="flex-1 py-0.5 px-1.5 bg-card text-foreground border-none rounded cursor-pointer text-[11px] hover:bg-card/80">+ Note</button>
-            <button onClick={() => onNewFolder(null)} className="flex-1 py-0.5 px-1.5 bg-card text-foreground border-none rounded cursor-pointer text-[11px] hover:bg-card/80">+ Folder</button>
+          <div className="flex gap-1 mb-2">
+            {/* New dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1 flex-1 py-0.5 px-2 bg-card text-foreground border-none rounded cursor-pointer text-[11px] hover:bg-card/80 justify-center">
+                  + New <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => onNewNote(null)}>Note</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onNewFolder(null)}>Folder</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Import dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1 flex-1 py-0.5 px-2 bg-card text-foreground border-none rounded cursor-pointer text-[11px] hover:bg-card/80 justify-center">
+                  Import <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => imageInputRef.current?.click()}>Image</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => notesInputRef.current?.click()}>Markdown files</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          <div className="mb-2 flex items-center gap-1.5">
-            <button onClick={() => imageInputRef.current?.click()} className="py-0.5 px-2 bg-card text-foreground border-none rounded cursor-pointer text-[11px] hover:bg-card/80">+ Image</button>
-            {copiedImage && <span className="text-[11px] text-ctp-green">Copied!</span>}
-          </div>
+
+          {/* Feedback */}
+          {copiedImage && <p className="text-[11px] text-ctp-green mb-1 px-1">Image copied to clipboard!</p>}
+          {importedCount !== null && <p className="text-[11px] text-ctp-green mb-1 px-1">Imported {importedCount} note{importedCount !== 1 ? 's' : ''}!</p>}
+
           <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+          <input
+            ref={notesInputRef}
+            type="file"
+            accept=".md,.markdown"
+            multiple
+            className="hidden"
+            onChange={async e => {
+              if (!e.target.files?.length) return
+              const count = await onImportNotes(e.target.files)
+              e.target.value = ''
+              setImportedCount(count)
+              setTimeout(() => setImportedCount(null), 3000)
+            }}
+          />
         </>
       )}
 

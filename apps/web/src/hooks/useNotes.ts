@@ -100,5 +100,22 @@ export function useNotes(projectId: string | null, token: string | null) {
     if (!res.ok) await refresh()
   }, [projectId, token, authHeaders, refresh])
 
-  return { notes, refresh, createNote, renameNote, deleteNote, moveNote }
+  const importNotes = useCallback(async (files: FileList): Promise<number> => {
+    if (!projectId || !token) return 0
+    const noteData = await Promise.all(
+      Array.from(files).map(async file => ({
+        path: file.name,
+        content: await file.text(),
+      }))
+    )
+    const res = await fetch(`${API}/api/projects/${projectId}/import/notes`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ notes: noteData }),
+    })
+    await refresh()
+    return res.ok ? noteData.length : 0
+  }, [projectId, token, authHeaders, refresh])
+
+  return { notes, refresh, createNote, renameNote, deleteNote, moveNote, importNotes }
 }
