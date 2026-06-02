@@ -57,9 +57,10 @@ export default function ProjectSettings({ project, token, onClose, onUpdated }: 
     const res = await fetch(`${API}/api/projects/${project.id}/invites`, {
       method: 'POST', headers: authHeaders, body: JSON.stringify({ role: newInviteRole }),
     })
-    if (res.ok) setInvites(i => [...i])
-    const newInvite = res.ok ? await res.json() as InviteInfo : null
-    if (newInvite) setInvites(i => [newInvite, ...i])
+    if (res.ok) {
+      const newInvite = await res.json() as InviteInfo
+      setInvites(i => [newInvite, ...i])
+    }
   }
 
   const revokeInvite = async (inviteId: string) => {
