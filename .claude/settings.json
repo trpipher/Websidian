@@ -199,7 +199,8 @@
       "Bash(grep -v \"^$\")",
       "Bash(xargs kill -9)",
       "Bash(lsof -ti:1235,3000)",
-      "Bash(lsof -ti:3100)"
+      "Bash(lsof -ti:3100)",
+      "Bash(/home/trpipher/.claude/plugins/cache/claude-plugins-official/superpowers/5.1.0/skills/brainstorming/scripts/start-server.sh --project-dir /mnt/d/Development/Websidian)"
     ],
     "additionalDirectories": [
       "/home/trpipher/.claude/plans",
