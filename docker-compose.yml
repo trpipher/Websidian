@@ -31,6 +31,7 @@ services:
       - BETTER_AUTH_URL=${BETTER_AUTH_URL}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - API_URL=http://sync:1235
+      - SYNC_URL=ws://sync:1234
     networks:
       - internal
 
