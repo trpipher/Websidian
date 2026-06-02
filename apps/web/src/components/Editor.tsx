@@ -1,17 +1,12 @@
 import { useEffect, useRef } from 'react'
-import { EditorView } from '@codemirror/view'
+import { EditorView, keymap } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { type Awareness } from 'y-protocols/awareness'
-import { keymap } from '@codemirror/view'
 import * as Y from 'yjs'
 import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next'
 import { buildExtensions } from '../lib/codemirror'
 
-interface Props {
-  yText: Y.Text
-  awareness: Awareness | null
-  onWikilinkClick?: (title: string) => void
-}
+interface Props { yText: Y.Text; awareness: Awareness | null; onWikilinkClick?: (title: string) => void }
 
 export default function Editor({ yText, awareness, onWikilinkClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -19,11 +14,7 @@ export default function Editor({ yText, awareness, onWikilinkClick }: Props) {
 
   useEffect(() => {
     if (!containerRef.current) return
-
     const undoManager = new Y.UndoManager(yText)
-
-    // Initialise CodeMirror with the current Yjs content so yCollab doesn't
-    // see an empty document and push a delete-everything op back to the Yjs doc.
     let view: EditorView
     try {
       view = new EditorView({
@@ -37,16 +28,9 @@ export default function Editor({ yText, awareness, onWikilinkClick }: Props) {
         }),
         parent: containerRef.current,
       })
-    } catch (e) {
-      undoManager.destroy()
-      throw e
-    }
+    } catch (e) { undoManager.destroy(); throw e }
     viewRef.current = view
-
     return () => {
-      // @codemirror/lang-markdown schedules requestIdleCallbacks for async parsing.
-      // Those callbacks can fire after view.destroy(), which throws because
-      // updateState === Destroyed !== Idle. Silence them with a no-op dispatch.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(view as any).dispatch = () => {}
       view.destroy()
@@ -55,10 +39,5 @@ export default function Editor({ yText, awareness, onWikilinkClick }: Props) {
     }
   }, [yText, awareness])
 
-  return (
-    <div
-      ref={containerRef}
-      style={{ flex: 1, height: '100%', overflow: 'auto' }}
-    />
-  )
+  return <div ref={containerRef} className="flex-1 h-full overflow-auto" />
 }
