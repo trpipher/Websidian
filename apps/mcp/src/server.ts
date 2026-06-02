@@ -26,7 +26,7 @@ function buildMcpServer(userToken: string): McpServer {
   }))
 
   server.registerTool('list_notes', {
-    description: 'List all notes in a project',
+    description: 'List all notes and folders in a project. Each item has an id, title, isFolder (true for folders), and parentId (null = root). Use folder IDs with create_note to place notes in a folder.',
     inputSchema: listNotesSchema,
   }, async (args) => ({
     content: [{ type: 'text', text: await listNotes(args, userToken) }],
