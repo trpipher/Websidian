@@ -13,6 +13,7 @@ import { SortableContext } from '@dnd-kit/sortable'
 import type { NoteMeta, ImageMeta } from '@websidian/shared'
 import SidebarItem from './SidebarItem'
 import SortMenu, { type SortConfig } from './SortMenu'
+import ContextMenu, { type ContextMenuItem } from './ContextMenu'
 
 const SORT_STORAGE_KEY = 'ws-sort-config'
 const DEFAULT_SORT: SortConfig = { by: 'title', direction: 'asc' }
@@ -113,12 +114,13 @@ interface Props {
   images: ImageMeta[]
   selectedImageId: string | null
   onSelectImage: (image: ImageMeta) => void
+  onRenameImage: (id: string, filename: string) => void
 }
 
 export default function Sidebar({
   notes, activeId, canEdit,
   onSelect, onNewNote, onNewFolder, onRename, onDelete, onMove, onUploadImage,
-  images, selectedImageId, onSelectImage,
+  images, selectedImageId, onSelectImage, onRenameImage,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [draggingId, setDraggingId] = useState<string | null>(null)
@@ -133,6 +135,10 @@ export default function Sidebar({
   const sortMenuJustClosed = useRef(false)
   const [copiedImage, setCopiedImage] = useState(false)
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const [renamingImageId, setRenamingImageId] = useState<string | null>(null)
+  const [imageRenameValue, setImageRenameValue] = useState('')
+  const [imageMenu, setImageMenu] = useState<{ id: string; x: number; y: number } | null>(null)
+  const imageRenameInputRef = useRef<HTMLInputElement>(null)
 
   // Auto-expand ancestors of the active note
   useEffect(() => {
@@ -373,26 +379,80 @@ export default function Sidebar({
           <div style={{ padding: '0 4px', marginBottom: 4 }}>
             <span style={{ fontWeight: 700, fontSize: 13, color: '#6c7086' }}>Images</span>
           </div>
-          {images.map(img => (
-            <div
-              key={img.id}
-              onClick={() => onSelectImage(img)}
-              style={{
-                padding: '4px 8px',
-                borderRadius: 4,
-                cursor: 'pointer',
-                fontSize: 13,
-                color: '#cdd6f4',
-                background: selectedImageId === img.id ? '#313244' : 'transparent',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-              title={img.filename}
-            >
-              🖼 {img.filename}
-            </div>
-          ))}
+          {images.map(img => {
+            const isRenaming = renamingImageId === img.id
+            const commitImageRename = () => {
+              const trimmed = imageRenameValue.trim()
+              if (trimmed && trimmed !== img.filename) onRenameImage(img.id, trimmed)
+              setRenamingImageId(null)
+            }
+            const startRename = () => {
+              setImageRenameValue(img.filename)
+              setRenamingImageId(img.id)
+              setTimeout(() => imageRenameInputRef.current?.select(), 10)
+            }
+            const imageMenuItems: ContextMenuItem[] = [
+              { label: 'Rename', onClick: startRename },
+            ]
+            return (
+              <div key={img.id}>
+                <div
+                  onClick={() => { if (!isRenaming) onSelectImage(img) }}
+                  onContextMenu={e => { if (!canEdit) return; e.preventDefault(); setImageMenu({ id: img.id, x: e.clientX, y: e.clientY }) }}
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    color: '#cdd6f4',
+                    background: selectedImageId === img.id ? '#313244' : 'transparent',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                  title={img.filename}
+                >
+                  <span style={{ flexShrink: 0 }}>🖼</span>
+                  {isRenaming ? (
+                    <input
+                      ref={imageRenameInputRef}
+                      value={imageRenameValue}
+                      onChange={e => setImageRenameValue(e.target.value)}
+                      onBlur={commitImageRename}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') commitImageRename()
+                        if (e.key === 'Escape') setRenamingImageId(null)
+                      }}
+                      onClick={e => e.stopPropagation()}
+                      autoFocus
+                      style={{
+                        flex: 1,
+                        background: '#313244',
+                        border: '1px solid #89b4fa',
+                        borderRadius: 3,
+                        color: '#cdd6f4',
+                        fontSize: 13,
+                        padding: '1px 4px',
+                      }}
+                    />
+                  ) : (
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {img.filename}
+                    </span>
+                  )}
+                </div>
+                {imageMenu?.id === img.id && (
+                  <ContextMenu
+                    x={imageMenu.x}
+                    y={imageMenu.y}
+                    items={imageMenuItems}
+                    onClose={() => setImageMenu(null)}
+                  />
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 

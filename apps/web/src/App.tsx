@@ -20,38 +20,6 @@ const API = import.meta.env.VITE_API_URL ?? 'http://localhost:1235'
 const USER_COLORS = ['#f38ba8', '#89b4fa', '#a6e3a1', '#fab387', '#cba6f7']
 const USER_COLOR = USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)]
 
-function ImageFilename({ image, onRename }: { image: ImageMeta; onRename: (name: string) => void }) {
-  const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState(image.filename)
-
-  useEffect(() => { setValue(image.filename) }, [image.filename])
-
-  const commit = () => {
-    setEditing(false)
-    const trimmed = value.trim()
-    if (trimmed && trimmed !== image.filename) onRename(trimmed)
-    else setValue(image.filename)
-  }
-
-  return editing ? (
-    <input
-      autoFocus
-      value={value}
-      onChange={e => setValue(e.target.value)}
-      onBlur={commit}
-      onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setValue(image.filename); setEditing(false) } }}
-      style={{ background: '#313244', border: 'none', borderRadius: 4, color: '#cdd6f4', fontSize: 12, padding: '2px 6px', marginBottom: 12, textAlign: 'center', outline: '1px solid #89b4fa' }}
-    />
-  ) : (
-    <div
-      onClick={() => setEditing(true)}
-      title="Click to rename"
-      style={{ color: '#6c7086', fontSize: 12, marginBottom: 12, cursor: 'text', padding: '2px 6px', borderRadius: 4 }}
-    >
-      {image.filename} ✎
-    </div>
-  )
-}
 
 export default function App() {
   const [authToken, setAuthToken] = useState<string | null>(
@@ -376,18 +344,16 @@ export default function App() {
             images={images}
             selectedImageId={selectedImage?.id ?? null}
             onSelectImage={img => { setSelectedImage(img); setActiveId(null) }}
+            onRenameImage={async (id, filename) => {
+              const ok = await renameImage(id, filename)
+              if (ok && selectedImage?.id === id) setSelectedImage({ ...selectedImage, filename })
+            }}
           />
         </div>
         {selectedImage
           ? (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, overflowY: 'auto' }}>
-              <ImageFilename
-                image={selectedImage}
-                onRename={async (filename) => {
-                  const ok = await renameImage(selectedImage.id, filename)
-                  if (ok) setSelectedImage({ ...selectedImage, filename })
-                }}
-              />
+              <div style={{ color: '#6c7086', fontSize: 12, marginBottom: 12 }}>{selectedImage.filename}</div>
               <img
                 src={`/api/projects/${selectedImage.projectId}/images/${selectedImage.id}`}
                 alt={selectedImage.filename}
