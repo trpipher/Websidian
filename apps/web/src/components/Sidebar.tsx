@@ -12,94 +12,100 @@ import {
 import { SortableContext } from '@dnd-kit/sortable'
 import type { NoteMeta, ImageMeta } from '@websidian/shared'
 import SidebarItem from './SidebarItem'
-import SortMenu, { type SortConfig } from './SortMenu'
-import ContextMenu, { type ContextMenuItem } from './ContextMenu'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
+import { Image as ImageIcon } from 'lucide-react'
 
-const SORT_STORAGE_KEY = 'ws-sort-config'
-const DEFAULT_SORT: SortConfig = { by: 'title', direction: 'asc' }
+// ── Sort types (previously in SortMenu.tsx) ───────────────────────────────────
+export type SortField = 'title' | 'createdAt' | 'updatedAt'
+export type SortDirection = 'asc' | 'desc'
+export interface SortConfig { by: SortField; direction: SortDirection }
 
+const SORT_FIELDS: { field: SortField; label: string }[] = [
+  { field: 'title',     label: 'Alphabetical' },
+  { field: 'createdAt', label: 'Date created' },
+  { field: 'updatedAt', label: 'Last edited'  },
+]
+
+const SORT_STORAGE_KEY = 'ws-sidebar-sort'
 function loadSortConfig(): SortConfig {
-  try {
-    const raw = localStorage.getItem(SORT_STORAGE_KEY)
-    if (!raw) return DEFAULT_SORT
-    const parsed = JSON.parse(raw) as Partial<SortConfig>
-    const validFields = ['title', 'createdAt', 'updatedAt']
-    const validDirs = ['asc', 'desc']
-    if (validFields.includes(parsed.by ?? '') && validDirs.includes(parsed.direction ?? '')) {
-      return parsed as SortConfig
-    }
-  } catch { /* ignore */ }
-  return DEFAULT_SORT
+  try { return JSON.parse(localStorage.getItem(SORT_STORAGE_KEY) ?? '') }
+  catch { return { by: 'title', direction: 'asc' } }
 }
 
-function sortNotes(items: NoteMeta[], config: SortConfig): NoteMeta[] {
-  const folders = items.filter(n => n.isFolder)
-  const notes = items.filter(n => !n.isFolder)
+// ── Tree helpers ──────────────────────────────────────────────────────────────
+interface NoteNode extends NoteMeta { children: NoteNode[]; depth: number }
 
-  const compare = (a: NoteMeta, b: NoteMeta): number => {
-    if (config.by === 'title') {
-      return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })
-    }
-    const aVal = config.by === 'createdAt' ? a.createdAt : a.updatedAt
-    const bVal = config.by === 'createdAt' ? b.createdAt : b.updatedAt
-    return aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+function buildTree(notes: NoteMeta[], sort: SortConfig): NoteNode[] {
+  const map = new Map<string, NoteNode>()
+  for (const n of notes) map.set(n.id, { ...n, children: [], depth: 0 })
+
+  const sorter = (a: NoteNode, b: NoteNode) => {
+    const folderFirst = (b.isFolder ? 1 : 0) - (a.isFolder ? 1 : 0)
+    if (folderFirst !== 0) return folderFirst
+    const av = a[sort.by] ?? ''; const bv = b[sort.by] ?? ''
+    const cmp = String(av).localeCompare(String(bv))
+    return sort.direction === 'asc' ? cmp : -cmp
   }
 
-  const sortedFolders = [...folders].sort(compare)
-  const sortedNotes = [...notes].sort(compare)
-
-  if (config.direction === 'desc') {
-    sortedFolders.reverse()
-    sortedNotes.reverse()
+  const roots: NoteNode[] = []
+  for (const node of map.values()) {
+    if (node.parentId && map.has(node.parentId)) map.get(node.parentId)!.children.push(node)
+    else roots.push(node)
   }
-
-  return [...sortedFolders, ...sortedNotes]
-}
-
-// Zone = folder to drop into (null = root). Derived purely from the over item.
-function computeDropZone(overId: string, notes: NoteMeta[]): string | null {
-  const over = notes.find(n => n.id === overId)
-  if (!over) return null
-  return over.isFolder ? overId : (over.parentId ?? null)
-}
-
-interface NoteNode extends NoteMeta {
-  children: NoteNode[]
-  depth: number
-}
-
-function buildTree(notes: NoteMeta[], config: SortConfig, parentId: string | null = null, depth = 0): NoteNode[] {
-  const children = notes.filter(n => (n.parentId ?? null) === parentId)
-  const sorted = sortNotes(children, config)
-  return sorted.map(n => ({ ...n, depth, children: buildTree(notes, config, n.id, depth + 1) }))
+  const assignDepth = (nodes: NoteNode[], depth: number) => {
+    nodes.sort(sorter)
+    for (const n of nodes) { n.depth = depth; assignDepth(n.children, depth + 1) }
+  }
+  roots.sort(sorter)
+  assignDepth(roots, 0)
+  return roots
 }
 
 function flattenVisible(nodes: NoteNode[], expanded: Set<string>): NoteNode[] {
   const result: NoteNode[] = []
-  for (const node of nodes) {
+  const visit = (node: NoteNode) => {
     result.push(node)
-    if (node.isFolder && expanded.has(node.id)) {
-      result.push(...flattenVisible(node.children, expanded))
-    }
+    if (node.isFolder && expanded.has(node.id)) node.children.forEach(visit)
   }
+  nodes.forEach(visit)
   return result
 }
 
-function countDescendants(notes: NoteMeta[], id: string): number {
-  const children = notes.filter(n => n.parentId === id)
-  return children.reduce((acc, c) => acc + 1 + countDescendants(notes, c.id), 0)
-}
-
 function getAncestorIds(notes: NoteMeta[], id: string): Set<string> {
+  const map = new Map(notes.map(n => [n.id, n]))
   const ancestors = new Set<string>()
-  let current = notes.find(n => n.id === id)
-  while (current?.parentId) {
-    ancestors.add(current.parentId)
-    current = notes.find(n => n.id === current!.parentId)
-  }
+  let cur = map.get(id)
+  while (cur?.parentId) { ancestors.add(cur.parentId); cur = map.get(cur.parentId) }
   return ancestors
 }
 
+function computeDropZone(overId: string, notes: NoteMeta[]): string | null {
+  const note = notes.find(n => n.id === overId)
+  return note?.isFolder ? note.id : (note?.parentId ?? null)
+}
+
+function countDescendants(notes: NoteMeta[], id: string): number {
+  let count = 0
+  const visit = (parentId: string) => {
+    for (const n of notes) { if (n.parentId === parentId) { count++; if (n.isFolder) visit(n.id) } }
+  }
+  visit(id)
+  return count
+}
+
+// ── Props ─────────────────────────────────────────────────────────────────────
 interface Props {
   notes: NoteMeta[]
   activeId: string | null
@@ -124,37 +130,24 @@ export default function Sidebar({
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [draggingId, setDraggingId] = useState<string | null>(null)
-  // undefined = not dragging; null = root zone; string = folder zone
   const [dropZone, setDropZone] = useState<string | null | undefined>(undefined)
   const lastDropZoneRef = useRef<string | null | undefined>(undefined)
   const overFolderTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [sortConfig, setSortConfig] = useState<SortConfig>(loadSortConfig)
-  const [showSortMenu, setShowSortMenu] = useState(false)
-  const [sortAnchorRect, setSortAnchorRect] = useState<DOMRect | null>(null)
-  const sortButtonRef = useRef<HTMLButtonElement>(null)
-  const sortMenuJustClosed = useRef(false)
   const [copiedImage, setCopiedImage] = useState(false)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const [renamingImageId, setRenamingImageId] = useState<string | null>(null)
   const [imageRenameValue, setImageRenameValue] = useState('')
-  const [imageMenu, setImageMenu] = useState<{ id: string; x: number; y: number } | null>(null)
   const imageRenameInputRef = useRef<HTMLInputElement>(null)
 
-  // Auto-expand ancestors of the active note
   useEffect(() => {
     if (!activeId) return
     const ancestors = getAncestorIds(notes, activeId)
-    if (ancestors.size > 0) {
-      setExpanded(prev => new Set([...prev, ...ancestors]))
-    }
+    if (ancestors.size > 0) setExpanded(prev => new Set([...prev, ...ancestors]))
   }, [activeId, notes])
 
   const toggle = useCallback((id: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id); else next.add(id)
-      return next
-    })
+    setExpanded(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
   }, [])
 
   const handleDelete = useCallback((id: string, isFolder: boolean, childCount: number) => {
@@ -170,13 +163,6 @@ export default function Sidebar({
     localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(config))
   }, [])
 
-  const handleCloseSortMenu = useCallback(() => {
-    setShowSortMenu(false)
-    sortMenuJustClosed.current = true
-    setTimeout(() => { sortMenuJustClosed.current = false }, 0)
-    sortButtonRef.current?.focus()
-  }, [])
-
   const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -189,34 +175,21 @@ export default function Sidebar({
     }
   }, [onUploadImage])
 
-  const handleSortButtonClick = useCallback(() => {
-    if (sortMenuJustClosed.current) return
-    setSortAnchorRect(sortButtonRef.current?.getBoundingClientRect() ?? null)
-    setShowSortMenu(prev => !prev)
-  }, [])
-
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
-
   const tree = buildTree(notes, sortConfig)
   const visibleIds = flattenVisible(tree, expanded).map(n => n.id)
 
-  const onDragStart = ({ active }: DragStartEvent) => {
-    setDraggingId(active.id as string)
-  }
+  const onDragStart = ({ active }: DragStartEvent) => setDraggingId(active.id as string)
 
   const onDragOver = ({ over }: DragOverEvent) => {
     if (!over) {
       if (overFolderTimer.current) { clearTimeout(overFolderTimer.current); overFolderTimer.current = null }
-      setDropZone(undefined)
-      lastDropZoneRef.current = undefined
-      return
+      setDropZone(undefined); lastDropZoneRef.current = undefined; return
     }
     const newZone = computeDropZone(over.id as string, notes)
     if (newZone !== lastDropZoneRef.current) {
       if (overFolderTimer.current) { clearTimeout(overFolderTimer.current); overFolderTimer.current = null }
-      setDropZone(newZone)
-      lastDropZoneRef.current = newZone
-      // Auto-expand collapsed folder target after a short delay
+      setDropZone(newZone); lastDropZoneRef.current = newZone
       if (newZone !== null && !expanded.has(newZone)) {
         overFolderTimer.current = setTimeout(() => {
           setExpanded(prev => new Set([...prev, newZone]))
@@ -227,31 +200,20 @@ export default function Sidebar({
   }
 
   const onDragEnd = ({ active, over }: DragEndEvent) => {
-    setDraggingId(null)
-    setDropZone(undefined)
-    lastDropZoneRef.current = undefined
+    setDraggingId(null); setDropZone(undefined); lastDropZoneRef.current = undefined
     if (overFolderTimer.current) { clearTimeout(overFolderTimer.current); overFolderTimer.current = null }
-
     if (!over || active.id === over.id) return
-
     const draggedId = active.id as string
     const dragged = notes.find(n => n.id === draggedId)
     if (!dragged) return
-
     const targetId = computeDropZone(over.id as string, notes)
-
-    // Prevent moving folder into its own descendant
     if (dragged.isFolder && targetId !== null) {
       const desc = new Set<string>()
-      const collectDesc = (id: string) => {
-        for (const n of notes) { if (n.parentId === id) { desc.add(n.id); collectDesc(n.id) } }
-      }
+      const collectDesc = (id: string) => { for (const n of notes) { if (n.parentId === id) { desc.add(n.id); collectDesc(n.id) } } }
       collectDesc(draggedId)
       if (desc.has(targetId)) return
     }
-
-    if ((dragged.parentId ?? null) === targetId) return  // already there
-
+    if ((dragged.parentId ?? null) === targetId) return
     onMove(draggedId, targetId)
   }
 
@@ -280,10 +242,7 @@ export default function Sidebar({
     return (
       <div
         key={`zone-${node.id}`}
-        style={{
-          background: dropZone === node.id ? 'rgba(137, 180, 250, 0.12)' : 'transparent',
-          borderRadius: 6,
-        }}
+        className={`rounded-md transition-colors ${dropZone === node.id ? 'bg-primary/10' : ''}`}
       >
         {item}
         {isExpanded && node.children.map(child => renderNode(child))}
@@ -292,92 +251,80 @@ export default function Sidebar({
   }
 
   return (
-    <aside style={{ padding: 8, color: '#cdd6f4', flex: 1, overflowY: 'auto', minHeight: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8, padding: '0 4px' }}>
-        <span style={{ fontWeight: 700, fontSize: 13, color: '#6c7086', flex: 1 }}>Notes</span>
-        <button
-          ref={sortButtonRef}
-          onClick={handleSortButtonClick}
-          title="Sort notes"
-          aria-label="Sort notes"
-          aria-haspopup="menu"
-          aria-expanded={showSortMenu}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: showSortMenu ? '#89b4fa' : '#6c7086',
-            cursor: 'pointer',
-            fontSize: 14,
-            padding: '1px 4px',
-            lineHeight: 1,
-          }}
-        >
-          ⇅
-        </button>
+    <aside className="p-2 text-foreground flex-1 overflow-y-auto min-h-0">
+      {/* Notes header row */}
+      <div className="flex items-center mb-2 px-1">
+        <span className="font-bold text-[13px] text-muted-foreground flex-1">Notes</span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="bg-transparent border-none text-muted-foreground cursor-pointer text-sm px-1 py-px leading-none hover:text-foreground"
+              title="Sort notes"
+              aria-label="Sort notes"
+            >
+              ⇅
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuLabel className="text-xs text-muted-foreground tracking-wide">SORT BY</DropdownMenuLabel>
+            {SORT_FIELDS.map(({ field, label }) => (
+              <DropdownMenuItem
+                key={field}
+                onClick={() => handleSortChange({
+                  by: field,
+                  direction: sortConfig.by === field
+                    ? (sortConfig.direction === 'asc' ? 'desc' : 'asc')
+                    : 'asc',
+                })}
+                className="flex items-center gap-2 text-[13px]"
+              >
+                <span className="w-3 text-primary text-[10px]">{sortConfig.by === field ? '●' : '○'}</span>
+                <span className="flex-1">{label}</span>
+                {sortConfig.by === field && (
+                  <span className="text-muted-foreground text-[11px]">
+                    {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                  </span>
+                )}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+
+      {/* Action buttons */}
       {canEdit && (
         <>
-          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
-            <button
-              onClick={() => onNewNote(null)}
-              style={{ flex: 1, padding: '3px 6px', background: '#313244', color: '#cdd6f4', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
-            >
-              + Note
-            </button>
-            <button
-              onClick={() => onNewFolder(null)}
-              style={{ flex: 1, padding: '3px 6px', background: '#313244', color: '#cdd6f4', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
-            >
-              + Folder
-            </button>
+          <div className="flex gap-1 mb-1">
+            <button onClick={() => onNewNote(null)} className="flex-1 py-0.5 px-1.5 bg-card text-foreground border-none rounded cursor-pointer text-[11px] hover:bg-card/80">+ Note</button>
+            <button onClick={() => onNewFolder(null)} className="flex-1 py-0.5 px-1.5 bg-card text-foreground border-none rounded cursor-pointer text-[11px] hover:bg-card/80">+ Folder</button>
           </div>
-          <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button
-              onClick={() => imageInputRef.current?.click()}
-              style={{ padding: '3px 8px', background: '#313244', color: '#cdd6f4', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
-            >
-              + Image
-            </button>
-            {copiedImage && (
-              <span style={{ fontSize: 11, color: '#a6e3a1' }}>Copied!</span>
-            )}
+          <div className="mb-2 flex items-center gap-1.5">
+            <button onClick={() => imageInputRef.current?.click()} className="py-0.5 px-2 bg-card text-foreground border-none rounded cursor-pointer text-[11px] hover:bg-card/80">+ Image</button>
+            {copiedImage && <span className="text-[11px] text-ctp-green">Copied!</span>}
           </div>
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={handleImageUpload}
-          />
+          <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
         </>
       )}
 
+      {/* Note tree */}
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
         <SortableContext items={visibleIds}>
           {tree.map(node => renderNode(node))}
         </SortableContext>
-
         <DragOverlay>
           {draggingNote && (
-            <div style={{
-              padding: '4px 8px',
-              borderRadius: 4,
-              background: '#313244',
-              fontSize: 13,
-              color: '#cdd6f4',
-              opacity: 0.9,
-              border: '1px solid #45475a',
-            }}>
+            <div className="px-2 py-1 rounded bg-card text-foreground text-[13px] opacity-90 border border-[#45475a]">
               {draggingNote.title}
             </div>
           )}
         </DragOverlay>
       </DndContext>
 
+      {/* Images section */}
       {images.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <div style={{ padding: '0 4px', marginBottom: 4 }}>
-            <span style={{ fontWeight: 700, fontSize: 13, color: '#6c7086' }}>Images</span>
+        <div className="mt-3">
+          <div className="px-1 mb-1">
+            <span className="font-bold text-[13px] text-muted-foreground">Images</span>
           </div>
           {images.map(img => {
             const isRenaming = renamingImageId === img.id
@@ -391,78 +338,43 @@ export default function Sidebar({
               setRenamingImageId(img.id)
               setTimeout(() => imageRenameInputRef.current?.select(), 10)
             }
-            const imageMenuItems: ContextMenuItem[] = [
-              { label: 'Rename', onClick: startRename },
-            ]
             return (
-              <div key={img.id}>
-                <div
-                  onClick={() => { if (!isRenaming) onSelectImage(img) }}
-                  onContextMenu={e => { if (!canEdit) return; e.preventDefault(); setImageMenu({ id: img.id, x: e.clientX, y: e.clientY }) }}
-                  style={{
-                    padding: '4px 8px',
-                    borderRadius: 4,
-                    cursor: 'pointer',
-                    fontSize: 13,
-                    color: '#cdd6f4',
-                    background: selectedImageId === img.id ? '#313244' : 'transparent',
-                    overflow: 'hidden',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
-                  title={img.filename}
-                >
-                  <span style={{ flexShrink: 0 }}>🖼</span>
-                  {isRenaming ? (
-                    <input
-                      ref={imageRenameInputRef}
-                      value={imageRenameValue}
-                      onChange={e => setImageRenameValue(e.target.value)}
-                      onBlur={commitImageRename}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') commitImageRename()
-                        if (e.key === 'Escape') setRenamingImageId(null)
-                      }}
-                      onClick={e => e.stopPropagation()}
-                      autoFocus
-                      style={{
-                        flex: 1,
-                        background: '#313244',
-                        border: '1px solid #89b4fa',
-                        borderRadius: 3,
-                        color: '#cdd6f4',
-                        fontSize: 13,
-                        padding: '1px 4px',
-                      }}
-                    />
-                  ) : (
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {img.filename}
-                    </span>
-                  )}
-                </div>
-                {imageMenu?.id === img.id && (
-                  <ContextMenu
-                    x={imageMenu.x}
-                    y={imageMenu.y}
-                    items={imageMenuItems}
-                    onClose={() => setImageMenu(null)}
-                  />
+              <ContextMenu key={img.id}>
+                <ContextMenuTrigger asChild>
+                  <div
+                    onClick={() => { if (!isRenaming) onSelectImage(img) }}
+                    className={`flex items-center gap-1 px-2 py-1 rounded cursor-pointer text-[13px] text-foreground overflow-hidden ${selectedImageId === img.id ? 'bg-card' : 'hover:bg-card/50'}`}
+                    title={img.filename}
+                  >
+                    <ImageIcon className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                    {isRenaming ? (
+                      <input
+                        ref={imageRenameInputRef}
+                        value={imageRenameValue}
+                        onChange={e => setImageRenameValue(e.target.value)}
+                        onBlur={commitImageRename}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') commitImageRename()
+                          if (e.key === 'Escape') setRenamingImageId(null)
+                        }}
+                        onClick={e => e.stopPropagation()}
+                        autoFocus
+                        className="flex-1 bg-card border border-primary rounded-sm text-foreground text-[13px] px-1 py-px focus:outline-none"
+                      />
+                    ) : (
+                      <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{img.filename}</span>
+                    )}
+                  </div>
+                </ContextMenuTrigger>
+                {canEdit && (
+                  <ContextMenuContent>
+                    <ContextMenuItem onClick={startRename}>Rename</ContextMenuItem>
+                  </ContextMenuContent>
                 )}
-              </div>
+              </ContextMenu>
             )
           })}
         </div>
-      )}
-
-      {showSortMenu && sortAnchorRect && (
-        <SortMenu
-          config={sortConfig}
-          anchorRect={sortAnchorRect}
-          onChange={handleSortChange}
-          onClose={handleCloseSortMenu}
-        />
       )}
     </aside>
   )

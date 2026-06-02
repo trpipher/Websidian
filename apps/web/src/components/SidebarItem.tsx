@@ -1,8 +1,14 @@
 import { useState, useRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import ContextMenu, { type ContextMenuItem } from './ContextMenu'
 import type { NoteMeta } from '@websidian/shared'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 
 interface Props {
   note: NoteMeta
@@ -10,7 +16,6 @@ interface Props {
   isActive: boolean
   isExpanded: boolean
   canEdit: boolean
-
   onSelect: (id: string) => void
   onToggle: (id: string) => void
   onRename: (id: string, title: string) => void
@@ -26,23 +31,12 @@ export default function SidebarItem({
 }: Props) {
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(note.title)
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: note.id, disabled: !canEdit })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-  }
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: note.id,
+    disabled: !canEdit,
+  })
 
   const commitRename = () => {
     const trimmed = renameValue.trim()
@@ -50,118 +44,92 @@ export default function SidebarItem({
     setIsRenaming(false)
   }
 
-  const handleContextMenu = (e: React.MouseEvent) => {
-    if (!canEdit) return
-    e.preventDefault()
-    setMenu({ x: e.clientX, y: e.clientY })
+  const startRename = () => {
+    setRenameValue(note.title)
+    setIsRenaming(true)
+    setTimeout(() => inputRef.current?.select(), 10)
   }
 
-  const menuItems: ContextMenuItem[] = note.isFolder
-    ? [
-        { label: 'Rename', onClick: () => { setRenameValue(note.title); setIsRenaming(true); setTimeout(() => inputRef.current?.select(), 10) } },
-        { label: 'New note inside', onClick: () => onNewNote(note.id) },
-        { label: 'New folder inside', onClick: () => onNewFolder(note.id) },
-        { label: 'Delete folder', onClick: () => onDelete(note.id, true, childCount), danger: true },
-      ]
-    : [
-        { label: 'Rename', onClick: () => { setRenameValue(note.title); setIsRenaming(true); setTimeout(() => inputRef.current?.select(), 10) } },
-        { label: 'Delete', onClick: () => onDelete(note.id, false, 0), danger: true },
-      ]
-
   return (
-    <>
-      <div
-        ref={setNodeRef}
-        style={{
-          ...style,
-          display: 'flex',
-          alignItems: 'center',
-          padding: '4px 8px',
-          paddingLeft: 8 + depth * 16,
-          borderRadius: 4,
-          cursor: 'pointer',
-          background: isActive ? '#313244' : 'transparent',
-          marginBottom: 1,
-          fontSize: 13,
-          color: '#cdd6f4',
-          userSelect: 'none',
-          gap: 2,
-        }}
-        onContextMenu={handleContextMenu}
-      >
-        {/* Chevron for folders, spacer for notes */}
-        {note.isFolder ? (
-          <span
-            onClick={e => { e.stopPropagation(); onToggle(note.id) }}
-            style={{ width: 16, flexShrink: 0, color: '#6c7086', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            {isExpanded ? '▼' : '▶'}
-          </span>
-        ) : (
-          <span style={{ width: 16, flexShrink: 0 }} />
-        )}
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          ref={setNodeRef}
+          style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1, paddingLeft: 8 + depth * 16 }}
+          className={`group flex items-center pr-2 py-1 rounded cursor-pointer mb-px text-[13px] text-foreground gap-0.5 select-none ${isActive ? 'bg-card' : 'hover:bg-card/50'}`}
+          onClick={() => { if (!isRenaming) onSelect(note.id) }}
+        >
+          {note.isFolder ? (
+            <span
+              onClick={e => { e.stopPropagation(); onToggle(note.id) }}
+              className="w-4 shrink-0 text-muted-foreground text-[10px] flex items-center justify-center"
+            >
+              {isExpanded ? '▼' : '▶'}
+            </span>
+          ) : (
+            <span className="w-4 shrink-0" />
+          )}
 
-        {/* Name or rename input */}
-        {isRenaming ? (
-          <input
-            ref={inputRef}
-            value={renameValue}
-            onChange={e => setRenameValue(e.target.value)}
-            onBlur={commitRename}
-            onKeyDown={e => {
-              if (e.key === 'Enter') commitRename()
-              if (e.key === 'Escape') setIsRenaming(false)
-            }}
-            style={{
-              flex: 1,
-              background: '#313244',
-              border: '1px solid #89b4fa',
-              borderRadius: 3,
-              color: '#cdd6f4',
-              fontSize: 13,
-              padding: '1px 4px',
-            }}
-            autoFocus
-            onClick={e => e.stopPropagation()}
-          />
-        ) : (
-          <span
-            style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-            onClick={() => onSelect(note.id)}
-          >
-            {note.isFolder ? '📁 ' : ''}{note.title}
-          </span>
-        )}
+          {isRenaming ? (
+            <input
+              ref={inputRef}
+              value={renameValue}
+              onChange={e => setRenameValue(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={e => {
+                if (e.key === 'Enter') commitRename()
+                if (e.key === 'Escape') setIsRenaming(false)
+              }}
+              onClick={e => e.stopPropagation()}
+              autoFocus
+              className="flex-1 bg-card border border-primary rounded-sm text-foreground text-[13px] px-1 py-px focus:outline-none"
+            />
+          ) : (
+            <span
+              className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+              onClick={() => onSelect(note.id)}
+            >
+              {note.isFolder ? '📁 ' : ''}{note.title}
+            </span>
+          )}
 
-        {/* Drag handle — only for editors */}
-        {canEdit && !isRenaming && (
-          <span
-            {...attributes}
-            {...listeners}
-            style={{
-              color: '#45475a',
-              cursor: 'grab',
-              fontSize: 14,
-              padding: '0 2px',
-              flexShrink: 0,
-            }}
-            className="drag-handle"
-          >
-            ⠿
-          </span>
-        )}
-      </div>
+          {canEdit && !isRenaming && (
+            <span
+              {...attributes}
+              {...listeners}
+              className="opacity-0 group-hover:opacity-100 text-[#45475a] cursor-grab text-sm px-0.5 shrink-0"
+            >
+              ⠿
+            </span>
+          )}
+        </div>
+      </ContextMenuTrigger>
 
-      {menu && (
-        <ContextMenu
-          x={menu.x}
-          y={menu.y}
-          items={menuItems}
-          onClose={() => setMenu(null)}
-        />
+      {canEdit && (
+        <ContextMenuContent>
+          <ContextMenuItem onClick={startRename}>Rename</ContextMenuItem>
+          {note.isFolder ? (
+            <>
+              <ContextMenuItem onClick={() => onNewNote(note.id)}>New note inside</ContextMenuItem>
+              <ContextMenuItem onClick={() => onNewFolder(note.id)}>New folder inside</ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                onClick={() => onDelete(note.id, true, childCount)}
+                className="text-destructive focus:text-destructive"
+              >
+                Delete folder
+              </ContextMenuItem>
+            </>
+          ) : (
+            <ContextMenuItem
+              onClick={() => onDelete(note.id, false, 0)}
+              className="text-destructive focus:text-destructive"
+            >
+              Delete
+            </ContextMenuItem>
+          )}
+        </ContextMenuContent>
       )}
-
-      <style>{`.drag-handle { opacity: 0 } div:hover > .drag-handle { opacity: 1 }`}</style>
-    </>
+    </ContextMenu>
   )
 }
