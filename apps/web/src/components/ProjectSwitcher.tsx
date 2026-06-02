@@ -1,6 +1,14 @@
 import { useState } from 'react'
 import type { Project } from '@websidian/shared'
 import NewProjectModal from './NewProjectModal'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { ChevronDown } from 'lucide-react'
 
 interface Props {
   projects: Project[]
@@ -11,82 +19,43 @@ interface Props {
 }
 
 export default function ProjectSwitcher({ projects, activeProject, token, onSelect, onRefreshProjects }: Props) {
-  const [open, setOpen] = useState(false)
   const [showModal, setShowModal] = useState(false)
 
   const handleProjectCreated = (project: Project) => {
     setShowModal(false)
-    setOpen(false)
     onRefreshProjects()
     onSelect(project)
   }
 
   return (
     <>
-      <div style={{ position: 'relative' }}>
-        <button
-          onClick={() => setOpen(o => !o)}
-          style={{
-            background: 'transparent',
-            border: '1px solid #313244',
-            borderRadius: 4,
-            color: '#cdd6f4',
-            cursor: 'pointer',
-            fontSize: 13,
-            padding: '2px 8px',
-          }}
-        >
-          {activeProject?.name ?? 'Select project'} ▾
-        </button>
-
-        {open && (
-          <div style={{
-            position: 'absolute',
-            top: 32,
-            left: 0,
-            background: '#181825',
-            border: '1px solid #313244',
-            borderRadius: 6,
-            minWidth: 200,
-            zIndex: 100,
-            padding: 8,
-          }}>
-            {projects.map(p => (
-              <div
-                key={p.id}
-                onClick={() => { onSelect(p); setOpen(false) }}
-                style={{
-                  padding: '6px 8px',
-                  borderRadius: 4,
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  color: p.id === activeProject?.id ? '#89b4fa' : '#cdd6f4',
-                  background: p.id === activeProject?.id ? '#313244' : 'transparent',
-                }}
-              >
-                {p.name}
-                {!!p.isPublic && <span style={{ fontSize: 10, color: '#6c7086', marginLeft: 6 }}>public</span>}
-              </div>
-            ))}
-
-            <div style={{ borderTop: '1px solid #313244', marginTop: 6, paddingTop: 6 }}>
-              <div
-                onClick={() => { setShowModal(true); setOpen(false) }}
-                style={{ color: '#89b4fa', cursor: 'pointer', fontSize: 12, padding: '4px 8px' }}
-              >
-                + New project
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="flex items-center gap-1 bg-transparent border border-border rounded px-2 py-0.5 text-foreground text-sm cursor-pointer hover:bg-card">
+            {activeProject?.name ?? 'Select project'}
+            <ChevronDown className="w-3 h-3 text-muted-foreground" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="min-w-[200px]">
+          {projects.map(p => (
+            <DropdownMenuItem
+              key={p.id}
+              onClick={() => onSelect(p)}
+              className={p.id === activeProject?.id ? 'text-primary bg-card' : ''}
+            >
+              {p.name}
+              {!!p.isPublic && <span className="ml-2 text-[10px] text-muted-foreground">public</span>}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setShowModal(true)} className="text-primary">
+            + New project
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {showModal && (
-        <NewProjectModal
-          token={token}
-          onCreated={handleProjectCreated}
-          onClose={() => setShowModal(false)}
-        />
+        <NewProjectModal token={token} onCreated={handleProjectCreated} onClose={() => setShowModal(false)} />
       )}
     </>
   )

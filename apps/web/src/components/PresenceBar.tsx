@@ -1,50 +1,21 @@
 import { useEffect, useState } from 'react'
 import type { Awareness } from 'y-protocols/awareness'
 
-interface AwarenessUser {
-  name: string
-  color: string
-  image?: string | null
-}
-
-interface AwarenessState {
-  user?: AwarenessUser
-}
-
-interface Props {
-  awareness: Awareness | null
-}
+interface AwarenessUser { name: string; color: string; image?: string | null }
+interface AwarenessState { user?: AwarenessUser }
+interface Props { awareness: Awareness | null }
 
 function UserAvatar({ user }: { user: AwarenessUser }) {
   const [imgFailed, setImgFailed] = useState(false)
   const showImage = !!user.image && !imgFailed
-
   return (
     <div
       title={user.name}
-      style={{
-        width: 28,
-        height: 28,
-        borderRadius: '50%',
-        border: `2px solid ${user.color}`,
-        overflow: 'hidden',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: 12,
-        color: '#fff',
-        fontWeight: 700,
-        background: showImage ? '#1e1e2e' : user.color,
-        flexShrink: 0,
-      }}
+      className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-bold text-white shrink-0"
+      style={{ border: `2px solid ${user.color}`, background: showImage ? '#1e1e2e' : user.color }}
     >
       {showImage ? (
-        <img
-          src={user.image!}
-          alt={user.name}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          onError={() => setImgFailed(true)}
-        />
+        <img src={user.image!} alt={user.name} className="w-full h-full object-cover block" onError={() => setImgFailed(true)} />
       ) : (
         user.name[0]?.toUpperCase()
       )}
@@ -63,17 +34,12 @@ export default function PresenceBar({ awareness }: Props) {
     return () => awareness.off('change', update)
   }, [awareness])
 
-  const users = Array.from(states.values())
-    .map((s) => s.user)
-    .filter(Boolean) as AwarenessUser[]
-
+  const users = Array.from(states.values()).map(s => s.user).filter(Boolean) as AwarenessUser[]
   if (users.length === 0) return null
 
   return (
-    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-      {users.map((u, i) => (
-        <UserAvatar key={i} user={u} />
-      ))}
+    <div className="flex gap-1.5 items-center">
+      {users.map((u, i) => <UserAvatar key={i} user={u} />)}
     </div>
   )
 }

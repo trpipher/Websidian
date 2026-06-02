@@ -1,6 +1,9 @@
 import { useState, useRef } from 'react'
 import type { Project } from '@websidian/shared'
 import { readVault, readVaultFromFileList } from '../lib/vaultImport'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:1235'
 
@@ -24,7 +27,6 @@ export default function NewProjectModal({ token, onCreated, onClose }: Props) {
   const [imagesDone, setImagesDone] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Display name for whichever vault source is selected
   const vaultName = vaultHandle?.name
     ?? (fileList ? fileList[0]?.webkitRelativePath.split('/')[0] : null)
 
@@ -32,194 +34,104 @@ export default function NewProjectModal({ token, onCreated, onClose }: Props) {
     if ('showDirectoryPicker' in window) {
       try {
         const handle = await (window as any).showDirectoryPicker({ mode: 'read' })
-        setVaultHandle(handle)
-        setFileList(null)
-        setErrorMsg('')
-      } catch {
-        // User cancelled or permission denied — do nothing
-      }
+        setVaultHandle(handle); setFileList(null); setErrorMsg('')
+      } catch { /* user cancelled */ }
     } else {
-      // Firefox/Safari fallback: <input webkitdirectory>
       fileInputRef.current?.click()
     }
   }
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setFileList(e.target.files)
-      setVaultHandle(null)
-      setErrorMsg('')
+      setFileList(e.target.files); setVaultHandle(null); setErrorMsg('')
     }
   }
 
   const handleCreate = async () => {
     if (!name.trim() || !token) return
     setStep('importing')
-    setErrorMsg('')
-
-    // Step 1: Create project
     const projRes = await fetch(`${API}/api/projects`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ name: name.trim() }),
     })
-    if (!projRes.ok) {
-      setErrorMsg('Failed to create project.')
-      setStep('error')
-      return
-    }
+    if (!projRes.ok) { setErrorMsg('Failed to create project.'); setStep('error'); return }
     const project = await projRes.json() as Project
 
     if (vaultHandle || fileList) {
-      // Step 2: Read vault from disk
-      const vaultData = vaultHandle
-        ? await readVault(vaultHandle)
-        : await readVaultFromFileList(fileList!)
+      const vaultData = vaultHandle ? await readVault(vaultHandle) : await readVaultFromFileList(fileList!)
       setNotesTotal(vaultData.notes.length)
-
       if (vaultData.notes.length > 0) {
-        // Step 3: Batch import notes
         const importRes = await fetch(`${API}/api/projects/${project.id}/import/notes`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ notes: vaultData.notes }),
         })
-        if (!importRes.ok) {
-          setErrorMsg('Project created but notes import failed. You can add notes manually.')
-          setStep('error')
-          onCreated(project)
-          return
-        }
+        if (!importRes.ok) { setErrorMsg('Notes import failed.'); setStep('error'); onCreated(project); return }
       }
       setNotesDone(true)
-
-      // Step 4: Upload images one by one
       setImagesTotal(vaultData.images.length)
       for (const { file } of vaultData.images) {
-        const formData = new FormData()
-        formData.append('file', file)
+        const fd = new FormData(); fd.append('file', file)
         await fetch(`${API}/api/projects/${project.id}/images`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
+          method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
         }).catch(() => {})
         setImagesDone(d => d + 1)
       }
     }
-
-    // Brief pause so the "Done ✓" state is visible before the modal closes
     if (vaultHandle || fileList) await new Promise(r => setTimeout(r, 800))
     onCreated(project)
   }
 
-  const inputStyle = {
-    flex: 1, background: '#313244', border: 'none', borderRadius: 4,
-    color: '#cdd6f4', fontSize: 13, padding: '6px 8px', outline: 'none',
-  } as const
-
-  const btnPrimary = {
-    background: '#89b4fa', border: 'none', borderRadius: 4,
-    cursor: 'pointer', fontSize: 12, padding: '5px 14px', color: '#1e1e2e', fontWeight: 600,
-  } as const
-
-  const btnSecondary = {
-    background: '#313244', border: 'none', borderRadius: 4,
-    cursor: 'pointer', fontSize: 12, padding: '5px 14px', color: '#cdd6f4',
-  } as const
-
   return (
-    <div
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400,
-      }}
-    >
-      <div style={{
-        background: '#1e1e2e', border: '1px solid #313244', borderRadius: 8,
-        padding: 24, minWidth: 340, maxWidth: 480, width: '100%',
-      }}>
-        <div style={{ fontWeight: 700, fontSize: 15, color: '#cdd6f4', marginBottom: 18 }}>
-          New Project
-        </div>
+    <Dialog open onOpenChange={open => !open && onClose()}>
+      <DialogContent className="bg-background border-border w-[480px]">
+        <DialogHeader>
+          <DialogTitle className="text-foreground">New Project</DialogTitle>
+        </DialogHeader>
 
         {(step === 'form' || step === 'error') && (
-          <>
-            <div style={{ marginBottom: 12 }}>
-              <input
-                autoFocus
-                value={name}
-                onChange={e => setName(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') onClose() }}
-                placeholder="Project name"
-                style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
-              />
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 11, color: '#6c7086', marginBottom: 6 }}>
-                Import from Obsidian vault (optional)
+          <div className="flex flex-col gap-3">
+            <Input
+              autoFocus
+              value={name}
+              onChange={e => setName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') onClose() }}
+              placeholder="Project name"
+            />
+            <div>
+              <p className="text-xs text-muted-foreground mb-1.5">Import from Obsidian vault (optional)</p>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" size="sm" onClick={handlePickVault}>Choose folder</Button>
+                {vaultName && <span className="text-xs text-ctp-green">📁 {vaultName}</span>}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button onClick={handlePickVault} style={btnSecondary}>
-                  Choose folder
-                </button>
-                {vaultName && (
-                  <span style={{ fontSize: 12, color: '#a6e3a1' }}>
-                    📁 {vaultName}
-                  </span>
-                )}
-              </div>
-              {/* Fallback for browsers without showDirectoryPicker (Firefox, Safari) */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                style={{ display: 'none' }}
-                onChange={handleFileInput}
-                // @ts-expect-error -- webkitdirectory is not in React's type defs
-                webkitdirectory="true"
-              />
+              <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileInput}
+                // @ts-expect-error webkitdirectory not in React types
+                webkitdirectory="true" />
             </div>
-
-            {step === 'error' && (
-              <div style={{ color: '#f38ba8', fontSize: 12, marginBottom: 12 }}>{errorMsg}</div>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button onClick={onClose} style={btnSecondary}>Cancel</button>
-              <button onClick={handleCreate} disabled={!name.trim()} style={{
-                ...btnPrimary,
-                opacity: name.trim() ? 1 : 0.4,
-                cursor: name.trim() ? 'pointer' : 'default',
-              }}>
+            {step === 'error' && <p className="text-destructive text-xs">{errorMsg}</p>}
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
+              <Button size="sm" disabled={!name.trim()} onClick={handleCreate}>
                 {vaultHandle || fileList ? 'Create & Import' : 'Create'}
-              </button>
+              </Button>
             </div>
-          </>
+          </div>
         )}
 
         {step === 'importing' && (
-          <div style={{ fontSize: 13, color: '#cdd6f4', lineHeight: 2 }}>
+          <div className="text-sm text-foreground leading-loose">
             <div>Creating project… ✓</div>
-            {notesTotal > 0 && (
-              <div>
-                Importing notes… {notesDone ? '✓' : `(${notesTotal} notes)`}
-              </div>
-            )}
+            {notesTotal > 0 && <div>Importing notes… {notesDone ? '✓' : `(${notesTotal} notes)`}</div>}
             {notesDone && imagesTotal > 0 && (
-              <div>
-                Uploading images… {imagesDone >= imagesTotal
-                  ? '✓'
-                  : `(${imagesDone} / ${imagesTotal})`}
-              </div>
+              <div>Uploading images… {imagesDone >= imagesTotal ? '✓' : `(${imagesDone} / ${imagesTotal})`}</div>
             )}
             {notesDone && (imagesTotal === 0 || imagesDone >= imagesTotal) && (
-              <div style={{ color: '#a6e3a1' }}>Done ✓</div>
+              <div className="text-ctp-green">Done ✓</div>
             )}
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
