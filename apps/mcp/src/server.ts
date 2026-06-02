@@ -9,6 +9,8 @@ import { createNote, createNoteSchema } from './tools/create-note.js'
 import { appendNote, appendNoteSchema } from './tools/append-note.js'
 import { editNote, editNoteSchema } from './tools/edit-note.js'
 import { moveNote, moveNoteSchema } from './tools/move-note.js'
+import { listImages, listImagesSchema } from './tools/list-images.js'
+import { renameImage, renameImageSchema } from './tools/rename-image.js'
 import { verifyJwt } from './lib/jwt.js'
 
 const PORT = parseInt(process.env.MCP_PORT ?? '3100')
@@ -66,6 +68,20 @@ function buildMcpServer(userToken: string): McpServer {
     inputSchema: editNoteSchema,
   }, async (args) => ({
     content: [{ type: 'text', text: await editNote(args) }],
+  }))
+
+  server.registerTool('list_images', {
+    description: 'List all images uploaded to a project. Returns id, filename, mimeType, size, and createdAt for each image.',
+    inputSchema: listImagesSchema,
+  }, async (args) => ({
+    content: [{ type: 'text', text: await listImages(args, userToken) }],
+  }))
+
+  server.registerTool('rename_image', {
+    description: 'Rename an image in a project. Use list_images to get image IDs.',
+    inputSchema: renameImageSchema,
+  }, async (args) => ({
+    content: [{ type: 'text', text: await renameImage(args, userToken) }],
   }))
 
   server.registerTool('move_note', {
