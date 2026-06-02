@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { NoteMeta } from '@websidian/shared'
 import {
   ContextMenu,
@@ -55,16 +56,16 @@ export default function SidebarItem({
       <ContextMenuTrigger asChild>
         <div
           ref={setNodeRef}
+          {...(canEdit ? { ...attributes, ...listeners } : {})}
           style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1, paddingLeft: 8 + depth * 16 }}
-          className={`group flex items-center pr-2 py-1 rounded cursor-pointer mb-px text-[13px] text-foreground gap-0.5 select-none ${isActive ? 'bg-card' : 'hover:bg-card/50'}`}
-          onClick={() => { if (!isRenaming) onSelect(note.id) }}
+          className={`flex items-center pr-2 py-1 rounded cursor-pointer mb-px text-[13px] text-foreground gap-0.5 select-none ${isActive ? 'bg-card' : 'hover:bg-card/50'}`}
+          onClick={() => { if (!isRenaming) onSelect(note.id); onToggle(note.id) }}
         >
           {note.isFolder ? (
             <span
-              onClick={e => { e.stopPropagation(); onToggle(note.id) }}
               className="w-4 shrink-0 text-muted-foreground text-[10px] flex items-center justify-center"
             >
-              {isExpanded ? '▼' : '▶'}
+              {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             </span>
           ) : (
             <span className="w-4 shrink-0" />
@@ -81,6 +82,7 @@ export default function SidebarItem({
                 if (e.key === 'Escape') setIsRenaming(false)
               }}
               onClick={e => e.stopPropagation()}
+              onPointerDown={e => e.stopPropagation()}
               autoFocus
               className="flex-1 bg-card border border-primary rounded-sm text-foreground text-[13px] px-1 py-px focus:outline-none"
             />
@@ -93,15 +95,6 @@ export default function SidebarItem({
             </span>
           )}
 
-          {canEdit && !isRenaming && (
-            <span
-              {...attributes}
-              {...listeners}
-              className="opacity-0 group-hover:opacity-100 text-[#45475a] cursor-grab text-sm px-0.5 shrink-0"
-            >
-              ⠿
-            </span>
-          )}
         </div>
       </ContextMenuTrigger>
 
