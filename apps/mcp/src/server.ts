@@ -8,6 +8,7 @@ import { readNote, readNoteSchema } from './tools/read-note.js'
 import { createNote, createNoteSchema } from './tools/create-note.js'
 import { appendNote, appendNoteSchema } from './tools/append-note.js'
 import { editNote, editNoteSchema } from './tools/edit-note.js'
+import { moveNote, moveNoteSchema } from './tools/move-note.js'
 import { verifyJwt } from './lib/jwt.js'
 
 const PORT = parseInt(process.env.MCP_PORT ?? '3100')
@@ -65,6 +66,13 @@ function buildMcpServer(userToken: string): McpServer {
     inputSchema: editNoteSchema,
   }, async (args) => ({
     content: [{ type: 'text', text: await editNote(args) }],
+  }))
+
+  server.registerTool('move_note', {
+    description: 'Move a note or folder to a different folder (or to the project root). Use list_notes to find folder IDs.',
+    inputSchema: moveNoteSchema,
+  }, async (args) => ({
+    content: [{ type: 'text', text: await moveNote(args, userToken) }],
   }))
 
   return server

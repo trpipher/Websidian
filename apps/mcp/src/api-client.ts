@@ -22,3 +22,13 @@ export async function apiPost(path: string, body: unknown, token: string): Promi
   if (!res.ok) throw new Error(`API POST ${path} → ${res.status} ${await res.text()}`)
   return res.json()
 }
+
+export async function apiPatch(path: string, body: unknown, token: string): Promise<unknown> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'PATCH',
+    headers: userHeaders(token),
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`API PATCH ${path} → ${res.status} ${await res.text()}`)
+  return res.json()
+}
