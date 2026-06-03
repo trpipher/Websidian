@@ -63,5 +63,16 @@ export function useImages(projectId: string | null, token: string | null) {
     return true
   }, [projectId, token])
 
-  return { images, uploadImage, renameImage }
+  const deleteImage = useCallback(async (imageId: string): Promise<boolean> => {
+    if (!projectId || !token) return false
+    const res = await fetch(`${API}/api/projects/${projectId}/images/${imageId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) return false
+    setImages(prev => prev.filter(img => img.id !== imageId))
+    return true
+  }, [projectId, token])
+
+  return { images, uploadImage, renameImage, deleteImage }
 }

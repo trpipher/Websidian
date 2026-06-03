@@ -105,7 +105,7 @@ export default function App() {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [selectedImage, setSelectedImage] = useState<ImageMeta | null>(null)
   const { notes, createNote, renameNote, deleteNote, moveNote, importNotes } = useNotes(activeProject?.id ?? null, authToken)
-  const { images, uploadImage, renameImage } = useImages(activeProject?.id ?? null, authToken)
+  const { images, uploadImage, renameImage, deleteImage } = useImages(activeProject?.id ?? null, authToken)
   const { yText, synced, awareness } = useProvider(activeId, authToken)
 
   useEffect(() => { if (!activeProject && projects.length > 0) setActiveProject(projects[0]) }, [projects, activeProject, setActiveProject])
@@ -292,6 +292,11 @@ export default function App() {
               onRenameImage={async (id, filename) => {
                 const ok = await renameImage(id, filename)
                 if (ok && selectedImage?.id === id) setSelectedImage({ ...selectedImage, filename })
+              }}
+              onDeleteImage={async (id) => {
+                const ok = await deleteImage(id)
+                if (ok && selectedImage?.id === id) setSelectedImage(null)
+                return ok
               }}
             />
           </div>

@@ -103,6 +103,25 @@ imagesRouter.patch('/:imageId', requireProjectRole('editor'), async (c) => {
   return c.json({ id: imageId, filename: filename.trim() })
 })
 
+// ── Delete image ──────────────────────────────────────────────────────────────
+imagesRouter.delete('/:imageId', requireProjectRole('editor'), async (c) => {
+  const projectId = c.req.param('projectId')!
+  const imageId = c.req.param('imageId')!
+
+  const existing = db.prepare(
+    'SELECT id FROM images WHERE id = ? AND project_id = ?'
+  ).get(imageId, projectId) as { id: string } | undefined
+
+  if (!existing) return c.json({ error: 'Not found' }, 404)
+
+  db.prepare('DELETE FROM images WHERE id = ? AND project_id = ?').run(imageId, projectId)
+
+  const filePath = imagePath(projectId, imageId)
+  try { unlinkSync(filePath) } catch { /* file may not exist on disk */ }
+
+  return c.json({ ok: true })
+})
+
 // ── Serve image bytes ──────────────────────────────────────────────────────────
 imagesRouter.get('/:imageId', async (c) => {
   const projectId = c.req.param('projectId')!

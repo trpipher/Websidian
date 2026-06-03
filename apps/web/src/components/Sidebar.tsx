@@ -23,6 +23,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 import { Image as ImageIcon, ChevronDown } from 'lucide-react'
@@ -123,12 +124,13 @@ interface Props {
   selectedImageId: string | null
   onSelectImage: (image: ImageMeta) => void
   onRenameImage: (id: string, filename: string) => void
+  onDeleteImage: (id: string) => Promise<boolean>
 }
 
 export default function Sidebar({
   notes, activeId, canEdit,
   onSelect, onNewNote, onNewFolder, onRename, onDelete, onMove, onUploadImage, onImportNotes, onImportVault,
-  images, selectedImageId, onSelectImage, onRenameImage,
+  images, selectedImageId, onSelectImage, onRenameImage, onDeleteImage,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [draggingId, setDraggingId] = useState<string | null>(null)
@@ -458,6 +460,13 @@ export default function Sidebar({
                 {canEdit && (
                   <ContextMenuContent>
                     <ContextMenuItem onClick={startRename}>Rename</ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                      onClick={() => onDeleteImage(img.id)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      Delete
+                    </ContextMenuItem>
                   </ContextMenuContent>
                 )}
               </ContextMenu>
