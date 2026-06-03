@@ -171,11 +171,12 @@ notesRouter.patch('/:id', requireProjectRole('editor'), async (c) => {
     }
   }
 
-  // Move conflict: note's current title already exists in the target folder
+  // Move conflict: auto-number the title in the target folder if needed
+  let resolvedTitle: string | undefined
   if (updates.parentId !== undefined) {
     const targetParent = updates.parentId
     if (titleExistsInParent(projectId, targetParent, current.title, id)) {
-      return c.json({ error: `A note named "${current.title}" already exists in the destination folder` }, 409)
+      resolvedTitle = uniqueTitle(projectId, targetParent, current.title)
     }
   }
 
@@ -199,17 +200,18 @@ notesRouter.patch('/:id', requireProjectRole('editor'), async (c) => {
     db.prepare('UPDATE notes SET title = ?, updated_at = ? WHERE id = ?').run(updates.title, now, id)
   if (updates.path !== undefined)
     db.prepare('UPDATE notes SET path = ?, updated_at = ? WHERE id = ?').run(updates.path, now, id)
-  if (updates.parentId !== undefined || updates.sortOrder !== undefined) {
+  if (updates.parentId !== undefined || updates.sortOrder !== undefined || resolvedTitle !== undefined) {
     const fields: string[] = []
     const vals: unknown[] = []
     if (updates.parentId !== undefined) { fields.push('parent_id = ?'); vals.push(updates.parentId) }
     if (updates.sortOrder !== undefined) { fields.push('sort_order = ?'); vals.push(updates.sortOrder) }
+    if (resolvedTitle !== undefined) { fields.push('title = ?'); vals.push(resolvedTitle) }
     fields.push('updated_at = ?'); vals.push(now)
     vals.push(id)
     db.prepare(`UPDATE notes SET ${fields.join(', ')} WHERE id = ?`).run(...vals)
   }
 
-  return c.json({ ok: true })
+  return c.json({ ok: true, ...(resolvedTitle !== undefined ? { title: resolvedTitle } : {}) })
 })
 
 // ── Delete note or folder (editor+, recursive for folders) ────────────────────

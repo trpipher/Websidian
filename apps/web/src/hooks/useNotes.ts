@@ -107,6 +107,10 @@ export function useNotes(projectId: string | null, token: string | null) {
       const body = await res.json().catch(() => ({})) as { error?: string }
       return body.error ?? 'Move failed'
     }
+    const body = await res.json().catch(() => ({})) as { title?: string }
+    if (body.title) {
+      setNotes(prev => prev.map(n => n.id === id ? { ...n, parentId, title: body.title! } : n))
+    }
     return null
   }, [projectId, token, authHeaders, refresh])
 
