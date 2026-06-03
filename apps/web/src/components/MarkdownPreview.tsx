@@ -104,6 +104,12 @@ export default function MarkdownPreview({ yText, awareness: _awareness, onWikili
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkFrontmatter]}
           components={{
+            h1({ children }) { return <h1>{processChildren(children, onWikilinkClick, imagesByName)}</h1> },
+            h2({ children }) { return <h2>{processChildren(children, onWikilinkClick, imagesByName)}</h2> },
+            h3({ children }) { return <h3>{processChildren(children, onWikilinkClick, imagesByName)}</h3> },
+            h4({ children }) { return <h4>{processChildren(children, onWikilinkClick, imagesByName)}</h4> },
+            h5({ children }) { return <h5>{processChildren(children, onWikilinkClick, imagesByName)}</h5> },
+            h6({ children }) { return <h6>{processChildren(children, onWikilinkClick, imagesByName)}</h6> },
             p({ children }) { return <p>{processChildren(children, onWikilinkClick, imagesByName)}</p> },
             li({ children }) { return <li>{processChildren(children, onWikilinkClick, imagesByName)}</li> },
             th({ children }) { return <th>{processChildren(children, onWikilinkClick, imagesByName)}</th> },
