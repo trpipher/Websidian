@@ -7,6 +7,7 @@ services:
       dockerfile: apps/sync/Dockerfile
     environment:
       - DB_PATH=/data/websidian.db
+      - DATA_DIR=/data
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - BETTER_AUTH_URL=${BETTER_AUTH_URL}
       - WEB_URL=${WEB_URL}
