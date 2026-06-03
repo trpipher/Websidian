@@ -253,7 +253,7 @@ export default function App() {
               onNewFolder={parentId => { if (!canEdit) return; createNote('New Folder', { parentId, isFolder: true }) }}
               onRename={(id, title) => renameNote(id, title)}
               onDelete={id => { deleteNote(id); if (activeId === id) setActiveId(null) }}
-              onMove={(id, parentId) => moveNote(id, parentId)}
+              onMove={(id, parentId, sortOrder) => moveNote(id, parentId, sortOrder)}
               onUploadImage={uploadImage}
               onImportNotes={importNotes}
               onImportVault={async source => {

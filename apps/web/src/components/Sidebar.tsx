@@ -116,7 +116,7 @@ interface Props {
   onNewFolder: (parentId?: string | null) => void
   onRename: (id: string, title: string) => Promise<string | null>
   onDelete: (id: string) => void
-  onMove: (id: string, parentId: string | null) => void
+  onMove: (id: string, parentId: string | null, sortOrder?: number) => void
   onUploadImage: (file: File) => Promise<ImageMeta | null>
   onImportNotes: (files: FileList) => Promise<number>
   onImportVault: (source: FileSystemDirectoryHandle | FileList) => Promise<{ notes: number; images: number }>
@@ -136,6 +136,7 @@ export default function Sidebar({
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dropZone, setDropZone] = useState<string | null | undefined>(undefined)
   const lastDropZoneRef = useRef<string | null | undefined>(undefined)
+  const [insertionPoint, setInsertionPoint] = useState<{ id: string; position: 'before' | 'after' } | null>(null)
   const overFolderTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [sortConfig, setSortConfig] = useState<SortConfig>(loadSortConfig)
   const [copiedImage, setCopiedImage] = useState(false)
@@ -189,48 +190,118 @@ export default function Sidebar({
   const tree = buildTree(notes, sortConfig)
   const visibleIds = flattenVisible(tree, expanded).map(n => n.id)
 
-  const onDragStart = ({ active }: DragStartEvent) => setDraggingId(active.id as string)
+  const onDragStart = ({ active }: DragStartEvent) => {
+    setDraggingId(active.id as string)
+    setInsertionPoint(null)
+  }
 
-  const onDragOver = ({ over }: DragOverEvent) => {
+  const onDragOver = ({ active, over }: DragOverEvent) => {
     if (!over) {
       if (overFolderTimer.current) { clearTimeout(overFolderTimer.current); overFolderTimer.current = null }
-      setDropZone(undefined); lastDropZoneRef.current = undefined; return
+      setDropZone(undefined); lastDropZoneRef.current = undefined
+      setInsertionPoint(null); return
     }
-    const newZone = computeDropZone(over.id as string, notes)
-    if (newZone !== lastDropZoneRef.current) {
-      if (overFolderTimer.current) { clearTimeout(overFolderTimer.current); overFolderTimer.current = null }
-      setDropZone(newZone); lastDropZoneRef.current = newZone
-      if (newZone !== null && !expanded.has(newZone)) {
-        overFolderTimer.current = setTimeout(() => {
-          setExpanded(prev => new Set([...prev, newZone]))
-          overFolderTimer.current = null
-        }, 600)
+    const overId = over.id as string
+    const overNote = notes.find(n => n.id === overId)
+
+    if (overNote?.isFolder) {
+      // Hovering a folder: drop inside it, no insertion line
+      setInsertionPoint(null)
+      const newZone = overNote.id
+      if (newZone !== lastDropZoneRef.current) {
+        if (overFolderTimer.current) { clearTimeout(overFolderTimer.current); overFolderTimer.current = null }
+        setDropZone(newZone); lastDropZoneRef.current = newZone
+        if (!expanded.has(newZone)) {
+          overFolderTimer.current = setTimeout(() => {
+            setExpanded(prev => new Set([...prev, newZone]))
+            overFolderTimer.current = null
+          }, 600)
+        }
+      }
+    } else {
+      // Hovering a note: show insertion line based on cursor position
+      const translated = active.rect.current.translated
+      if (translated) {
+        const activeCenter = translated.top + translated.height / 2
+        const overCenter = over.rect.top + over.rect.height / 2
+        const position: 'before' | 'after' = activeCenter < overCenter ? 'before' : 'after'
+        setInsertionPoint(prev =>
+          prev?.id === overId && prev.position === position ? prev : { id: overId, position }
+        )
+      }
+      // Track parent context for folder auto-expand
+      const parentZone = overNote?.parentId ?? null
+      if (parentZone !== lastDropZoneRef.current) {
+        if (overFolderTimer.current) { clearTimeout(overFolderTimer.current); overFolderTimer.current = null }
+        setDropZone(parentZone); lastDropZoneRef.current = parentZone
       }
     }
   }
 
   const onDragEnd = ({ active, over }: DragEndEvent) => {
+    const ip = insertionPoint
     setDraggingId(null); setDropZone(undefined); lastDropZoneRef.current = undefined
+    setInsertionPoint(null)
     if (overFolderTimer.current) { clearTimeout(overFolderTimer.current); overFolderTimer.current = null }
     if (!over || active.id === over.id) return
+
     const draggedId = active.id as string
     const dragged = notes.find(n => n.id === draggedId)
     if (!dragged) return
-    const targetId = computeDropZone(over.id as string, notes)
-    if (dragged.isFolder && targetId !== null) {
+
+    const overNote = notes.find(n => n.id === (over.id as string))
+    let targetParentId: string | null
+    let targetSortOrder: number | undefined
+
+    if (overNote?.isFolder) {
+      // Dropped into folder — place at end
+      targetParentId = overNote.id
+    } else if (ip) {
+      // Dropped via insertion line
+      const anchor = notes.find(n => n.id === ip.id)
+      targetParentId = anchor?.parentId ?? null
+      // Compute sort order between neighbors
+      const siblings = notes
+        .filter(n => (n.parentId ?? null) === targetParentId && n.id !== draggedId)
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+      const idx = siblings.findIndex(n => n.id === ip.id)
+      if (idx !== -1) {
+        if (ip.position === 'before') {
+          const prev = siblings[idx - 1]
+          const curr = siblings[idx]
+          targetSortOrder = prev ? (prev.sortOrder + curr.sortOrder) / 2 : curr.sortOrder - 500
+        } else {
+          const curr = siblings[idx]
+          const next = siblings[idx + 1]
+          targetSortOrder = next ? (curr.sortOrder + next.sortOrder) / 2 : curr.sortOrder + 500
+        }
+      }
+    } else {
+      targetParentId = computeDropZone(over.id as string, notes)
+    }
+
+    // Cycle check for folder moves
+    if (dragged.isFolder && targetParentId !== null) {
       const desc = new Set<string>()
       const collectDesc = (id: string) => { for (const n of notes) { if (n.parentId === id) { desc.add(n.id); collectDesc(n.id) } } }
       collectDesc(draggedId)
-      if (desc.has(targetId)) return
+      if (desc.has(targetParentId)) return
     }
-    if ((dragged.parentId ?? null) === targetId) return
-    onMove(draggedId, targetId)
+
+    if ((dragged.parentId ?? null) === targetParentId && targetSortOrder === undefined) return
+    onMove(draggedId, targetParentId, targetSortOrder)
   }
 
   const draggingNote = draggingId ? notes.find(n => n.id === draggingId) : null
 
+  const insertLine = <div className="h-0.5 bg-primary mx-1 my-px rounded-full pointer-events-none" />
+
   const renderNode = (node: NoteNode): React.ReactNode => {
     const isExpanded = expanded.has(node.id)
+    const isFolderTarget = dropZone === node.id && node.isFolder
+    const insertBefore = insertionPoint?.id === node.id && insertionPoint.position === 'before'
+    const insertAfter = insertionPoint?.id === node.id && insertionPoint.position === 'after'
+
     const item = (
       <SidebarItem
         key={node.id}
@@ -248,12 +319,23 @@ export default function Sidebar({
         childCount={countDescendants(notes, node.id)}
       />
     )
-    if (!node.isFolder) return item
+
+    if (!node.isFolder) {
+      return (
+        <React.Fragment key={node.id}>
+          {insertBefore && insertLine}
+          {item}
+          {insertAfter && insertLine}
+        </React.Fragment>
+      )
+    }
+
     return (
       <div
         key={`zone-${node.id}`}
-        className={`rounded-md transition-colors ${dropZone === node.id ? 'bg-primary/10' : ''}`}
+        className={`rounded-md transition-colors ${isFolderTarget ? 'bg-primary/10 ring-1 ring-inset ring-primary/20' : ''}`}
       >
+        {insertBefore && insertLine}
         {item}
         {isExpanded && node.children.map(child => renderNode(child))}
       </div>

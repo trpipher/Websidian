@@ -94,13 +94,13 @@ export function useNotes(projectId: string | null, token: string | null) {
     await refresh()
   }, [projectId, token, refresh])
 
-  const moveNote = useCallback(async (id: string, parentId: string | null): Promise<string | null> => {
+  const moveNote = useCallback(async (id: string, parentId: string | null, sortOrder?: number): Promise<string | null> => {
     if (!projectId || !token) return null
-    setNotes(prev => prev.map(n => n.id === id ? { ...n, parentId } : n))
+    setNotes(prev => prev.map(n => n.id === id ? { ...n, parentId, ...(sortOrder !== undefined ? { sortOrder } : {}) } : n))
     const res = await fetch(`${API}/api/projects/${projectId}/notes/${id}`, {
       method: 'PATCH',
       headers: authHeaders(),
-      body: JSON.stringify({ parentId }),
+      body: JSON.stringify({ parentId, ...(sortOrder !== undefined ? { sortOrder } : {}) }),
     })
     if (!res.ok) {
       await refresh()
