@@ -85,11 +85,21 @@ imagesRouter.patch('/:imageId', requireProjectRole('editor'), async (c) => {
   const { filename } = await c.req.json<{ filename: string }>()
   if (!filename?.trim()) return c.json({ error: 'filename required' }, 400)
 
-  const result = db.prepare(
-    'UPDATE images SET filename = ? WHERE id = ? AND project_id = ?'
-  ).run(filename.trim(), imageId, projectId)
+  // Look up the row regardless of project_id so we can give a useful error
+  const existing = db.prepare(
+    'SELECT id, project_id FROM images WHERE id = ?'
+  ).get(imageId) as { id: string; project_id: string } | undefined
 
-  if (result.changes === 0) return c.json({ error: 'Not found' }, 404)
+  if (!existing) {
+    console.warn(`[images] PATCH: image ${imageId} not found in DB`)
+    return c.json({ error: 'Not found' }, 404)
+  }
+  if (existing.project_id !== projectId) {
+    console.warn(`[images] PATCH: project_id mismatch — DB has ${existing.project_id}, request has ${projectId}`)
+    return c.json({ error: 'Not found' }, 404)
+  }
+
+  db.prepare('UPDATE images SET filename = ? WHERE id = ?').run(filename.trim(), imageId)
   return c.json({ id: imageId, filename: filename.trim() })
 })
 
