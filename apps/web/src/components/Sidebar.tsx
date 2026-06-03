@@ -145,6 +145,8 @@ export default function Sidebar({
   const [renamingImageId, setRenamingImageId] = useState<string | null>(null)
   const [imageRenameValue, setImageRenameValue] = useState('')
   const imageRenameInputRef = useRef<HTMLInputElement>(null)
+  // Prevents onBlur from double-firing the rename after Enter/Escape already handled it
+  const imageRenameActiveRef = useRef(false)
 
   useEffect(() => {
     if (!activeId) return
@@ -407,12 +409,8 @@ export default function Sidebar({
           </div>
           {images.map(img => {
             const isRenaming = renamingImageId === img.id
-            const commitImageRename = () => {
-              const trimmed = imageRenameValue.trim()
-              if (trimmed && trimmed !== img.filename) onRenameImage(img.id, trimmed)
-              setRenamingImageId(null)
-            }
             const startRename = () => {
+              imageRenameActiveRef.current = true
               setImageRenameValue(img.filename)
               setRenamingImageId(img.id)
               setTimeout(() => imageRenameInputRef.current?.select(), 10)
@@ -431,10 +429,22 @@ export default function Sidebar({
                         ref={imageRenameInputRef}
                         value={imageRenameValue}
                         onChange={e => setImageRenameValue(e.target.value)}
-                        onBlur={commitImageRename}
+                        onBlur={() => {
+                          if (!imageRenameActiveRef.current) return
+                          imageRenameActiveRef.current = false
+                          const trimmed = imageRenameValue.trim()
+                          if (trimmed && trimmed !== img.filename) onRenameImage(img.id, trimmed)
+                          setRenamingImageId(null)
+                        }}
                         onKeyDown={e => {
-                          if (e.key === 'Enter') commitImageRename()
-                          if (e.key === 'Escape') setRenamingImageId(null)
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            imageRenameInputRef.current?.blur()
+                          }
+                          if (e.key === 'Escape') {
+                            imageRenameActiveRef.current = false
+                            setRenamingImageId(null)
+                          }
                         }}
                         onClick={e => e.stopPropagation()}
                         autoFocus
