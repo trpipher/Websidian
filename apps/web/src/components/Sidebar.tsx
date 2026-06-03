@@ -114,7 +114,7 @@ interface Props {
   onSelect: (id: string) => void
   onNewNote: (parentId?: string | null) => void
   onNewFolder: (parentId?: string | null) => void
-  onRename: (id: string, title: string) => void
+  onRename: (id: string, title: string) => Promise<string | null>
   onDelete: (id: string) => void
   onMove: (id: string, parentId: string | null) => void
   onUploadImage: (file: File) => Promise<ImageMeta | null>

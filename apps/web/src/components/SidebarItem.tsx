@@ -19,7 +19,7 @@ interface Props {
   canEdit: boolean
   onSelect: (id: string) => void
   onToggle: (id: string) => void
-  onRename: (id: string, title: string) => void
+  onRename: (id: string, title: string) => Promise<string | null>
   onDelete: (id: string, isFolder: boolean, childCount: number) => void
   onNewNote: (parentId: string) => void
   onNewFolder: (parentId: string) => void
@@ -32,6 +32,7 @@ export default function SidebarItem({
 }: Props) {
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(note.title)
+  const [renameError, setRenameError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -39,14 +40,22 @@ export default function SidebarItem({
     disabled: !canEdit,
   })
 
-  const commitRename = () => {
+  const commitRename = async () => {
     const trimmed = renameValue.trim()
-    if (trimmed && trimmed !== note.title) onRename(note.id, trimmed)
-    setIsRenaming(false)
+    if (!trimmed || trimmed === note.title) { setIsRenaming(false); setRenameError(null); return }
+    const err = await onRename(note.id, trimmed)
+    if (err) {
+      setRenameError(err)
+      setTimeout(() => inputRef.current?.focus(), 0)
+    } else {
+      setIsRenaming(false)
+      setRenameError(null)
+    }
   }
 
   const startRename = () => {
     setRenameValue(note.title)
+    setRenameError(null)
     setIsRenaming(true)
     setTimeout(() => inputRef.current?.select(), 10)
   }
@@ -75,23 +84,24 @@ export default function SidebarItem({
             <input
               ref={inputRef}
               value={renameValue}
-              onChange={e => setRenameValue(e.target.value)}
+              onChange={e => { setRenameValue(e.target.value); setRenameError(null) }}
               onBlur={commitRename}
               onKeyDown={e => {
                 if (e.key === 'Enter') commitRename()
-                if (e.key === 'Escape') setIsRenaming(false)
+                if (e.key === 'Escape') { setIsRenaming(false); setRenameError(null) }
               }}
               onClick={e => e.stopPropagation()}
               onPointerDown={e => e.stopPropagation()}
               autoFocus
-              className="flex-1 bg-card border border-primary rounded-sm text-foreground text-[13px] px-1 py-px focus:outline-none"
+              title={renameError ?? undefined}
+              className={`flex-1 bg-card rounded-sm text-foreground text-[13px] px-1 py-px focus:outline-none border ${renameError ? 'border-destructive' : 'border-primary'}`}
             />
           ) : (
             <span
               className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
               onClick={() => onSelect(note.id)}
             >
-              {note.isFolder ? '📁 ' : ''}{note.title}
+              {note.title}
             </span>
           )}
 

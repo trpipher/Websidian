@@ -33,6 +33,24 @@ notesRouter.get('/', async (c) => {
   })))
 })
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function titleExistsInParent(projectId: string, parentId: string | null, title: string, excludeId?: string): boolean {
+  const row = db.prepare(`
+    SELECT COUNT(*) as n FROM notes
+    WHERE project_id = ? AND COALESCE(parent_id, '') = COALESCE(?, '') AND title = ?
+      AND deleted_at IS NULL ${excludeId ? 'AND id != ?' : ''}
+  `).get(...([projectId, parentId, title, ...(excludeId ? [excludeId] : [])] as unknown[])) as { n: number }
+  return row.n > 0
+}
+
+/** Returns a unique title by appending " 2", " 3", etc. when a conflict exists. */
+function uniqueTitle(projectId: string, parentId: string | null, base: string): string {
+  if (!titleExistsInParent(projectId, parentId, base)) return base
+  let n = 2
+  while (titleExistsInParent(projectId, parentId, `${base} ${n}`)) n++
+  return `${base} ${n}`
+}
+
 // ── Create note or folder ─────────────────────────────────────────────────────
 notesRouter.post('/', requireProjectRole('editor'), async (c) => {
   const projectId = c.req.param('projectId')
@@ -41,9 +59,9 @@ notesRouter.post('/', requireProjectRole('editor'), async (c) => {
     parentId?: string | null
     isFolder?: boolean
   }>()
-  const { title, parentId = null, isFolder = false } = body
+  const { title: rawTitle, parentId = null, isFolder = false } = body
+  const title = uniqueTitle(projectId!, parentId, rawTitle)
   const id = randomUUID()
-  // Path is server-generated using the UUID so duplicate titles never collide
   const path = `${title.replace(/[^a-z0-9]+/gi, '-')}-${id.slice(0, 8)}.md`
   const now = new Date().toISOString()
 
@@ -139,6 +157,27 @@ notesRouter.patch('/:id', requireProjectRole('editor'), async (c) => {
     sortOrder: number
   }>>()
   const now = new Date().toISOString()
+
+  const projectId = c.req.param('projectId')!
+  const current = db.prepare(
+    'SELECT title, parent_id, project_id FROM notes WHERE id = ?'
+  ).get(id) as { title: string; parent_id: string | null; project_id: string } | undefined
+  if (!current) return c.json({ error: 'Not found' }, 404)
+
+  // Rename conflict: same title already exists in the same folder
+  if (updates.title !== undefined && updates.title !== current.title) {
+    if (titleExistsInParent(projectId, current.parent_id, updates.title, id)) {
+      return c.json({ error: `A note named "${updates.title}" already exists in this folder` }, 409)
+    }
+  }
+
+  // Move conflict: note's current title already exists in the target folder
+  if (updates.parentId !== undefined) {
+    const targetParent = updates.parentId
+    if (titleExistsInParent(projectId, targetParent, current.title, id)) {
+      return c.json({ error: `A note named "${current.title}" already exists in the destination folder` }, 409)
+    }
+  }
 
   // Cycle check: if moving a folder, ensure the new parentId is not a descendant
   if (updates.parentId !== undefined) {

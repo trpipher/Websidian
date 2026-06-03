@@ -70,14 +70,19 @@ export function useNotes(projectId: string | null, token: string | null) {
     return res.ok ? (await res.json() as NoteMeta) : null
   }, [projectId, token, authHeaders, refresh])
 
-  const renameNote = useCallback(async (id: string, title: string) => {
-    if (!projectId || !token) return
-    await fetch(`${API}/api/projects/${projectId}/notes/${id}`, {
+  const renameNote = useCallback(async (id: string, title: string): Promise<string | null> => {
+    if (!projectId || !token) return null
+    const res = await fetch(`${API}/api/projects/${projectId}/notes/${id}`, {
       method: 'PATCH',
       headers: authHeaders(),
       body: JSON.stringify({ title }),
     })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as { error?: string }
+      return body.error ?? 'Rename failed'
+    }
     await refresh()
+    return null
   }, [projectId, token, authHeaders, refresh])
 
   const deleteNote = useCallback(async (id: string) => {
@@ -89,15 +94,20 @@ export function useNotes(projectId: string | null, token: string | null) {
     await refresh()
   }, [projectId, token, refresh])
 
-  const moveNote = useCallback(async (id: string, parentId: string | null) => {
-    if (!projectId || !token) return
+  const moveNote = useCallback(async (id: string, parentId: string | null): Promise<string | null> => {
+    if (!projectId || !token) return null
     setNotes(prev => prev.map(n => n.id === id ? { ...n, parentId } : n))
     const res = await fetch(`${API}/api/projects/${projectId}/notes/${id}`, {
       method: 'PATCH',
       headers: authHeaders(),
       body: JSON.stringify({ parentId }),
     })
-    if (!res.ok) await refresh()
+    if (!res.ok) {
+      await refresh()
+      const body = await res.json().catch(() => ({})) as { error?: string }
+      return body.error ?? 'Move failed'
+    }
+    return null
   }, [projectId, token, authHeaders, refresh])
 
   const importNotes = useCallback(async (files: FileList): Promise<number> => {
