@@ -17,6 +17,7 @@ import { useProjectContext } from './contexts/ProjectContext'
 import { Settings, Hexagon, PencilLine, BookOpen, PanelRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { readVault, readVaultFromFileList } from './lib/vaultImport'
 import type { Project, ImageMeta } from '@websidian/shared'
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:1235'
@@ -255,6 +256,36 @@ export default function App() {
               onMove={(id, parentId) => moveNote(id, parentId)}
               onUploadImage={uploadImage}
               onImportNotes={importNotes}
+              onImportVault={async source => {
+                if (!activeProject || !authToken) return { notes: 0, images: 0 }
+                const vault = source instanceof FileList
+                  ? await readVaultFromFileList(source)
+                  : await readVault(source)
+
+                let importedNotes = 0
+                if (vault.notes.length > 0) {
+                  const res = await fetch(`${API}/api/projects/${activeProject.id}/import/notes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+                    body: JSON.stringify({ notes: vault.notes }),
+                  })
+                  if (res.ok) importedNotes = vault.notes.filter(n => !n.isFolder).length
+                }
+
+                let importedImages = 0
+                for (const { file } of vault.images) {
+                  const fd = new FormData()
+                  fd.append('file', file)
+                  const res = await fetch(`${API}/api/projects/${activeProject.id}/images`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${authToken}` },
+                    body: fd,
+                  })
+                  if (res.ok) importedImages++
+                }
+
+                return { notes: importedNotes, images: importedImages }
+              }}
               images={images}
               selectedImageId={selectedImage?.id ?? null}
               onSelectImage={img => { setSelectedImage(img); setActiveId(null) }}

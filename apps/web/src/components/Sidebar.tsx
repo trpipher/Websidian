@@ -119,6 +119,7 @@ interface Props {
   onMove: (id: string, parentId: string | null) => void
   onUploadImage: (file: File) => Promise<ImageMeta | null>
   onImportNotes: (files: FileList) => Promise<number>
+  onImportVault: (source: FileSystemDirectoryHandle | FileList) => Promise<{ notes: number; images: number }>
   images: ImageMeta[]
   selectedImageId: string | null
   onSelectImage: (image: ImageMeta) => void
@@ -127,7 +128,7 @@ interface Props {
 
 export default function Sidebar({
   notes, activeId, canEdit,
-  onSelect, onNewNote, onNewFolder, onRename, onDelete, onMove, onUploadImage, onImportNotes,
+  onSelect, onNewNote, onNewFolder, onRename, onDelete, onMove, onUploadImage, onImportNotes, onImportVault,
   images, selectedImageId, onSelectImage, onRenameImage,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -138,8 +139,10 @@ export default function Sidebar({
   const [sortConfig, setSortConfig] = useState<SortConfig>(loadSortConfig)
   const [copiedImage, setCopiedImage] = useState(false)
   const [importedCount, setImportedCount] = useState<number | null>(null)
+  const [vaultImportResult, setVaultImportResult] = useState<{ notes: number; images: number } | null>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const notesInputRef = useRef<HTMLInputElement>(null)
+  const folderInputRef = useRef<HTMLInputElement>(null)
   const [renamingImageId, setRenamingImageId] = useState<string | null>(null)
   const [imageRenameValue, setImageRenameValue] = useState('')
   const imageRenameInputRef = useRef<HTMLInputElement>(null)
@@ -323,6 +326,20 @@ export default function Sidebar({
                 <DropdownMenuItem onClick={() => imageInputRef.current?.click()}>Image</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => notesInputRef.current?.click()}>Markdown files</DropdownMenuItem>
+                <DropdownMenuItem onClick={async () => {
+                  let source: FileSystemDirectoryHandle | FileList | null = null
+                  if ('showDirectoryPicker' in window) {
+                    try { source = await (window as any).showDirectoryPicker({ mode: 'read' }) }
+                    catch { return }
+                  } else {
+                    folderInputRef.current?.click()
+                    return
+                  }
+                  if (!source) return
+                  const result = await onImportVault(source)
+                  setVaultImportResult(result)
+                  setTimeout(() => setVaultImportResult(null), 4000)
+                }}>Folder</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -330,6 +347,12 @@ export default function Sidebar({
           {/* Feedback */}
           {copiedImage && <p className="text-[11px] text-ctp-green mb-1 px-1">Image copied to clipboard!</p>}
           {importedCount !== null && <p className="text-[11px] text-ctp-green mb-1 px-1">Imported {importedCount} note{importedCount !== 1 ? 's' : ''}!</p>}
+          {vaultImportResult !== null && (
+            <p className="text-[11px] text-ctp-green mb-1 px-1">
+              Imported {vaultImportResult.notes} note{vaultImportResult.notes !== 1 ? 's' : ''}
+              {vaultImportResult.images > 0 ? ` + ${vaultImportResult.images} image${vaultImportResult.images !== 1 ? 's' : ''}` : ''}!
+            </p>
+          )}
 
           <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
           <input
@@ -344,6 +367,21 @@ export default function Sidebar({
               e.target.value = ''
               setImportedCount(count)
               setTimeout(() => setImportedCount(null), 3000)
+            }}
+          />
+          <input
+            ref={folderInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            // @ts-expect-error webkitdirectory not in React types
+            webkitdirectory="true"
+            onChange={async e => {
+              if (!e.target.files?.length) return
+              const result = await onImportVault(e.target.files)
+              e.target.value = ''
+              setVaultImportResult(result)
+              setTimeout(() => setVaultImportResult(null), 4000)
             }}
           />
         </>
