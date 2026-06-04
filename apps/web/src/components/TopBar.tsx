@@ -52,19 +52,13 @@ export default function TopBar({
 
       {!isMobile && <span className="text-foreground font-bold shrink-0">Websidian</span>}
 
-      {!isMobile && (
-        <ProjectSwitcher
-          projects={projects}
-          activeProject={activeProject}
-          token={token}
-          onSelect={onSelectProject}
-          onRefreshProjects={onRefreshProjects}
-        />
-      )}
-
-      {isMobile && activeProject && (
-        <span className="text-foreground text-sm font-medium truncate flex-1">{activeProject.name}</span>
-      )}
+      <ProjectSwitcher
+        projects={projects}
+        activeProject={activeProject}
+        token={token}
+        onSelect={onSelectProject}
+        onRefreshProjects={onRefreshProjects}
+      />
 
       {isOwnerOrAdmin && activeProject && !isMobile && (
         <Tooltip>
