@@ -1,3 +1,4 @@
+// apps/web/src/components/Editor.tsx
 import { useEffect, useRef } from 'react'
 import { EditorView, keymap } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
@@ -6,9 +7,15 @@ import * as Y from 'yjs'
 import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next'
 import { buildExtensions } from '../lib/codemirror'
 
-interface Props { yText: Y.Text; awareness: Awareness | null; onWikilinkClick?: (title: string) => void }
+interface Props {
+  yText: Y.Text
+  awareness: Awareness | null
+  onWikilinkClick?: (title: string) => void
+  onReady?: (view: EditorView | null) => void
+  className?: string
+}
 
-export default function Editor({ yText, awareness, onWikilinkClick }: Props) {
+export default function Editor({ yText, awareness, onWikilinkClick, onReady, className }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
 
@@ -30,7 +37,9 @@ export default function Editor({ yText, awareness, onWikilinkClick }: Props) {
       })
     } catch (e) { undoManager.destroy(); throw e }
     viewRef.current = view
+    onReady?.(view)
     return () => {
+      onReady?.(null)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(view as any).dispatch = () => {}
       view.destroy()
@@ -39,5 +48,5 @@ export default function Editor({ yText, awareness, onWikilinkClick }: Props) {
     }
   }, [yText, awareness])
 
-  return <div ref={containerRef} className="flex-1 h-full overflow-auto" />
+  return <div ref={containerRef} className={`flex-1 h-full overflow-auto ${className ?? ''}`} />
 }

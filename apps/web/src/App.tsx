@@ -19,6 +19,9 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { readVault, readVaultFromFileList } from './lib/vaultImport'
 import type { Project, ImageMeta } from '@websidian/shared'
+import { type EditorView } from '@codemirror/view'
+import MarkdownToolbar from './components/MarkdownToolbar'
+import { useBreakpoint } from './hooks/useBreakpoint'
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:1235'
 const USER_COLORS = ['#f38ba8', '#89b4fa', '#a6e3a1', '#fab387', '#cba6f7']
@@ -33,6 +36,9 @@ export default function App() {
   const [showSearch, setShowSearch] = useState(false)
   const [showLinks, setShowLinks] = useState(false)
   const [previewMode, setPreviewMode] = useState(true)
+  const [editorView, setEditorView] = useState<EditorView | null>(null)
+  const { isMobile, isTablet, isPortrait } = useBreakpoint()
+  const showMobileToolbar = isMobile || (isTablet && isPortrait)
 
   const [pendingInviteToken] = useState<string | null>(() => {
     const match = window.location.pathname.match(/^\/invite\/([a-f0-9]+)$/)
@@ -314,7 +320,13 @@ export default function App() {
           ) : activeId && yText ? (
             previewMode
               ? <MarkdownPreview yText={yText} awareness={awareness} onWikilinkClick={handleWikilinkClick} images={images} />
-              : <Editor yText={yText} awareness={awareness} onWikilinkClick={handleWikilinkClick} />
+              : <Editor
+                  yText={yText}
+                  awareness={awareness}
+                  onWikilinkClick={handleWikilinkClick}
+                  onReady={setEditorView}
+                  className={showMobileToolbar ? 'pb-14' : ''}
+                />
           ) : (
             <div className="flex-1 flex items-center justify-center text-muted-foreground">
               {!activeProject ? 'Select or create a project' : notes.length === 0 ? 'Create your first note' : 'Select a note'}
@@ -344,6 +356,7 @@ export default function App() {
             onSelect={id => { setActiveId(id); setSelectedImage(null); setShowSearch(false) }} onClose={() => setShowSearch(false)} />
         )}
       </div>
+      <MarkdownToolbar view={editorView} />
     </TooltipProvider>
   )
 }
