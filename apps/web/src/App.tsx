@@ -37,6 +37,7 @@ export default function App() {
   const [previewMode, setPreviewMode] = useState(true)
   const [editorView, setEditorView] = useState<EditorView | null>(null)
   const { isMobile, isTablet, isPortrait } = useBreakpoint()
+  const useDrawer = isMobile || (isTablet && isPortrait)
   const showMobileToolbar = isMobile || (isTablet && isPortrait)
 
   const [pendingInviteToken] = useState<string | null>(() => {
@@ -191,7 +192,7 @@ export default function App() {
           showLinks={showLinks}
           synced={synced}
           awareness={awareness}
-          isMobile={isMobile}
+          isMobile={useDrawer}
           onOpenDrawer={() => setIsDrawerOpen(true)}
           onSelectProject={p => { setActiveProject(p); setActiveId(null); setPreviewMode(true) }}
           onRefreshProjects={refreshProjects}
