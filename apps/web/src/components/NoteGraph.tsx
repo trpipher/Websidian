@@ -3,6 +3,7 @@ import ForceGraph2D from 'react-force-graph-2d'
 import { forceCollide } from 'd3-force'
 import type { NoteMeta, LinkEdge } from '@websidian/shared'
 import { X } from 'lucide-react'
+import { useBreakpoint } from '@/hooks/useBreakpoint'
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:1235'
 
@@ -10,12 +11,22 @@ interface Props { notes: NoteMeta[]; projectId: string; token: string | null; on
 
 export default function NoteGraph({ notes, projectId, token, onSelect, onClose }: Props) {
   const [links, setLinks] = useState<LinkEdge[]>([])
+  const { isMobile, isTablet } = useBreakpoint()
 
   useEffect(() => {
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
     fetch(`${API}/api/projects/${projectId}/notes/graph`, { headers })
       .then(r => r.ok ? r.json() : []).then(setLinks).catch(() => {})
   }, [projectId, token])
+
+  const graphWidth = isMobile
+    ? window.innerWidth - 16
+    : isTablet ? Math.min(window.innerWidth - 48, 800)
+    : 1000
+  const graphHeight = isMobile
+    ? window.innerHeight - 80
+    : isTablet ? Math.min(window.innerHeight - 80, 600)
+    : 700
 
   const nodesKey = notes.map(n => `${n.id}:${n.title}`).join('\n')
   const linksKey = links.map(l => `${l.sourceId}>${l.targetId}`).join('\n')
@@ -74,8 +85,8 @@ export default function NoteGraph({ notes, projectId, token, onSelect, onClose }
           onNodeClick={handleClick}
           cooldownTicks={400}
           warmupTicks={50}
-          width={1000}
-          height={700}
+          width={graphWidth}
+          height={graphHeight}
         />
       </div>
     </div>
