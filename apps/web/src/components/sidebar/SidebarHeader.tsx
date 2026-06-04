@@ -5,7 +5,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { SORT_FIELDS, SORT_STORAGE_KEY, type SortConfig } from '@/lib/sidebarTree'
+import { SORT_FIELDS, type SortConfig } from '@/lib/sidebarTree'
 import type { ImageMeta } from '@websidian/shared'
 
 interface Props {
