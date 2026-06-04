@@ -2,21 +2,19 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Editor from './components/Editor'
 import MarkdownPreview from './components/MarkdownPreview'
 import Sidebar from './components/Sidebar'
-import PresenceBar from './components/PresenceBar'
 import LoginPage from './components/LoginPage'
-import ProjectSwitcher from './components/ProjectSwitcher'
 import ProjectSettings from './components/ProjectSettings'
 import LinksPanel from './components/LinksPanel'
 import NoteGraph from './components/NoteGraph'
 import SearchModal from './components/SearchModal'
+import TopBar from './components/TopBar'
+import AppLayout from './components/AppLayout'
 import { useProvider } from './hooks/useProvider'
 import { useNotes } from './hooks/useNotes'
 import { useImages } from './hooks/useImages'
 import { useProjects } from './hooks/useProjects'
 import { useProjectContext } from './contexts/ProjectContext'
-import { Settings, Hexagon, PencilLine, BookOpen, PanelRight } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { readVault, readVaultFromFileList } from './lib/vaultImport'
 import type { Project, ImageMeta } from '@websidian/shared'
 import { type EditorView } from '@codemirror/view'
@@ -35,6 +33,7 @@ export default function App() {
   const [showGraph, setShowGraph] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [showLinks, setShowLinks] = useState(false)
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [previewMode, setPreviewMode] = useState(true)
   const [editorView, setEditorView] = useState<EditorView | null>(null)
   const { isMobile, isTablet, isPortrait } = useBreakpoint()
@@ -179,82 +178,42 @@ export default function App() {
   return (
     <TooltipProvider>
       <div className="flex flex-col h-screen bg-background">
-        {/* Header */}
-        <header className="h-10 flex items-center bg-[#181825] border-b border-border px-3 gap-3 shrink-0">
-          <span className="text-foreground font-bold shrink-0">Websidian</span>
+        <TopBar
+          userName={userName}
+          userImage={userImage}
+          activeProject={activeProject}
+          projects={projects}
+          token={authToken}
+          isOwnerOrAdmin={isOwnerOrAdmin}
+          canEdit={canEdit}
+          activeId={activeId}
+          previewMode={previewMode}
+          showLinks={showLinks}
+          synced={synced}
+          awareness={awareness}
+          isMobile={isMobile}
+          onOpenDrawer={() => setIsDrawerOpen(true)}
+          onSelectProject={p => { setActiveProject(p); setActiveId(null); setPreviewMode(true) }}
+          onRefreshProjects={refreshProjects}
+          onShowSettings={() => setShowSettings(true)}
+          onShowGraph={() => setShowGraph(true)}
+          onTogglePreview={() => setPreviewMode(m => !m)}
+          onToggleLinks={() => setShowLinks(s => !s)}
+          onLogout={handleLogout}
+        />
 
-          <ProjectSwitcher
-            projects={projects}
-            activeProject={activeProject}
-            token={authToken}
-            onSelect={p => { setActiveProject(p); setActiveId(null); setPreviewMode(true) }}
-            onRefreshProjects={refreshProjects}
-          />
-
-          {isOwnerOrAdmin && activeProject && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="w-7 h-7 text-muted-foreground" onClick={() => setShowSettings(true)}>
-                  <Settings className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Project settings</TooltipContent>
-            </Tooltip>
-          )}
-
-          {activeProject && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="w-7 h-7 text-muted-foreground" onClick={() => setShowGraph(true)}>
-                  <Hexagon className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Graph view</TooltipContent>
-            </Tooltip>
-          )}
-
-          {activeId && canEdit && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="w-7 h-7 text-muted-foreground" onClick={() => setPreviewMode(m => !m)}>
-                  {previewMode ? <PencilLine className="w-4 h-4" /> : <BookOpen className="w-4 h-4" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{previewMode ? 'Switch to edit mode' : 'Switch to preview mode'}</TooltipContent>
-            </Tooltip>
-          )}
-
-          <PresenceBar awareness={awareness} />
-          {!synced && activeId && <span className="text-muted-foreground text-xs">syncing…</span>}
-
-          <div className="ml-auto flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className={`w-7 h-7 ${showLinks ? 'text-primary' : 'text-muted-foreground'}`} onClick={() => setShowLinks(s => !s)}>
-                  <PanelRight className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Toggle links panel</TooltipContent>
-            </Tooltip>
-            {userImage && <img src={userImage} alt={userName} className="w-[22px] h-[22px] rounded-full object-cover" />}
-            <span className="text-muted-foreground text-xs">{userName}</span>
-            <Button variant="outline" size="sm" className="h-6 text-xs text-muted-foreground" onClick={handleLogout}>Sign out</Button>
-          </div>
-        </header>
-
-        {/* Body */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Sidebar column */}
-          <div className="flex flex-col w-60 shrink-0 border-r border-border bg-background overflow-hidden">
+        <AppLayout
+          sidebar={
             <Sidebar
               notes={notes}
               activeId={activeId}
               canEdit={canEdit}
-              onSelect={id => { setActiveId(id); setSelectedImage(null) }}
+              onSelect={id => { setActiveId(id); setSelectedImage(null); setIsDrawerOpen(false) }}
               onNewNote={parentId => {
                 if (!canEdit) return
                 createNote('Untitled', { parentId }).then(note => { if (note?.id) { setActiveId(note.id); setSelectedImage(null) } })
                 setPreviewMode(false)
+                setIsDrawerOpen(false)
               }}
               onNewFolder={parentId => { if (!canEdit) return; createNote('New Folder', { parentId, isFolder: true }) }}
               onRename={(id, title) => renameNote(id, title)}
@@ -305,9 +264,19 @@ export default function App() {
                 return ok
               }}
             />
-          </div>
-
-          {/* Main content */}
+          }
+          linksPanel={
+            <LinksPanel
+              noteId={activeId}
+              projectId={activeProject?.id ?? null}
+              token={authToken}
+              onSelect={id => { setActiveId(id); setSelectedImage(null) }}
+            />
+          }
+          showLinks={showLinks}
+          isDrawerOpen={isDrawerOpen}
+          onCloseDrawer={() => setIsDrawerOpen(false)}
+        >
           {selectedImage ? (
             <div className="flex-1 flex flex-col items-center justify-center p-8 overflow-y-auto">
               <p className="text-muted-foreground text-xs mb-3">{selectedImage.filename}</p>
@@ -320,29 +289,14 @@ export default function App() {
           ) : activeId && yText ? (
             previewMode
               ? <MarkdownPreview yText={yText} awareness={awareness} onWikilinkClick={handleWikilinkClick} images={images} />
-              : <Editor
-                  yText={yText}
-                  awareness={awareness}
-                  onWikilinkClick={handleWikilinkClick}
-                  onReady={setEditorView}
-                  className={showMobileToolbar ? 'pb-14' : ''}
-                />
+              : <Editor yText={yText} awareness={awareness} onWikilinkClick={handleWikilinkClick} onReady={setEditorView} className={showMobileToolbar ? 'pb-14' : ''} />
           ) : (
             <div className="flex-1 flex items-center justify-center text-muted-foreground">
               {!activeProject ? 'Select or create a project' : notes.length === 0 ? 'Create your first note' : 'Select a note'}
             </div>
           )}
+        </AppLayout>
 
-          {/* Links panel */}
-          <div
-            className="overflow-hidden shrink-0 transition-[width] duration-200"
-            style={{ width: showLinks ? 260 : 0 }}
-          >
-            <LinksPanel noteId={activeId} projectId={activeProject?.id ?? null} token={authToken} onSelect={id => { setActiveId(id); setSelectedImage(null) }} />
-          </div>
-        </div>
-
-        {/* Modals */}
         {showSettings && activeProject && authToken && (
           <ProjectSettings project={activeProject} token={authToken} onClose={() => setShowSettings(false)}
             onUpdated={updates => setActiveProject({ ...activeProject, ...updates } as Project)} />
@@ -355,8 +309,9 @@ export default function App() {
           <SearchModal projectId={activeProject.id} token={authToken} notes={notes}
             onSelect={id => { setActiveId(id); setSelectedImage(null); setShowSearch(false) }} onClose={() => setShowSearch(false)} />
         )}
+
+        <MarkdownToolbar view={editorView} />
       </div>
-      <MarkdownToolbar view={editorView} />
     </TooltipProvider>
   )
 }
