@@ -66,7 +66,7 @@ export default function SidebarItem({
           ref={setNodeRef}
           {...(canEdit ? { ...attributes, ...listeners } : {})}
           style={{ opacity: isDragging ? 0 : 1, paddingLeft: 8 + depth * 16 }}
-          className={`flex items-center pr-2 py-1 rounded cursor-pointer mb-px text-[13px] text-foreground gap-0.5 select-none ${isActive ? 'bg-card' : 'hover:bg-card/50'}`}
+          className={`flex items-center pr-2 py-1 rounded cursor-pointer mb-px text-[13px] text-foreground gap-0.5 select-none min-h-[44px] ${isActive ? 'bg-card' : 'hover:bg-card/50'}`}
           onClick={() => { if (!isRenaming) onSelect(note.id); onToggle(note.id) }}
         >
           {note.isFolder ? (
