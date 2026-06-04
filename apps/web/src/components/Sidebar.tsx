@@ -1,39 +1,11 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
-import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type DragStartEvent,
-  type DragOverEvent,
-} from '@dnd-kit/core'
-import { SortableContext } from '@dnd-kit/sortable'
+// apps/web/src/components/Sidebar.tsx
+import { useState, useCallback } from 'react'
 import type { NoteMeta, ImageMeta } from '@websidian/shared'
-import SidebarItem from './SidebarItem'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from '@/components/ui/context-menu'
-import { Image as ImageIcon, ChevronDown } from 'lucide-react'
-import {
-  type SortField, type SortDirection, type SortConfig, type NoteNode,
-  SORT_FIELDS, SORT_STORAGE_KEY, loadSortConfig,
-  buildTree, flattenVisible, getAncestorIds, computeDropZone, countDescendants,
-} from '@/lib/sidebarTree'
+import { loadSortConfig, SORT_STORAGE_KEY, type SortConfig } from '@/lib/sidebarTree'
+import SidebarHeader from './sidebar/SidebarHeader'
+import SidebarFileTree from './sidebar/SidebarFileTree'
+import SidebarImages from './sidebar/SidebarImages'
 
-// ── Props ─────────────────────────────────────────────────────────────────────
 interface Props {
   notes: NoteMeta[]
   activeId: string | null
@@ -56,433 +28,49 @@ interface Props {
 
 export default function Sidebar({
   notes, activeId, canEdit,
-  onSelect, onNewNote, onNewFolder, onRename, onDelete, onMove, onUploadImage, onImportNotes, onImportVault,
+  onSelect, onNewNote, onNewFolder, onRename, onDelete, onMove,
+  onUploadImage, onImportNotes, onImportVault,
   images, selectedImageId, onSelectImage, onRenameImage, onDeleteImage,
 }: Props) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [draggingId, setDraggingId] = useState<string | null>(null)
-  const [dropZone, setDropZone] = useState<string | null | undefined>(undefined)
-  const lastDropZoneRef = useRef<string | null | undefined>(undefined)
-  const [insertionPoint, setInsertionPoint] = useState<{ id: string; position: 'before' | 'after' } | null>(null)
-  const overFolderTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [sortConfig, setSortConfig] = useState<SortConfig>(loadSortConfig)
-  const [copiedImage, setCopiedImage] = useState(false)
-  const [importedCount, setImportedCount] = useState<number | null>(null)
-  const [vaultImportResult, setVaultImportResult] = useState<{ notes: number; images: number } | null>(null)
-  const imageInputRef = useRef<HTMLInputElement>(null)
-  const notesInputRef = useRef<HTMLInputElement>(null)
-  const folderInputRef = useRef<HTMLInputElement>(null)
-  const [renamingImageId, setRenamingImageId] = useState<string | null>(null)
-  const [imageRenameValue, setImageRenameValue] = useState('')
-  const imageRenameInputRef = useRef<HTMLInputElement>(null)
-  // Prevents onBlur from double-firing the rename after Enter/Escape already handled it
-  const imageRenameActiveRef = useRef(false)
-
-  useEffect(() => {
-    if (!activeId) return
-    const ancestors = getAncestorIds(notes, activeId)
-    if (ancestors.size > 0) setExpanded(prev => new Set([...prev, ...ancestors]))
-  }, [activeId, notes])
-
-  const toggle = useCallback((id: string) => {
-    setExpanded(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next })
-  }, [])
-
-  const handleDelete = useCallback((id: string, isFolder: boolean, childCount: number) => {
-    if (isFolder && childCount > 0) {
-      const note = notes.find(n => n.id === id)
-      if (!window.confirm(`Delete "${note?.title}" and all ${childCount} items inside?`)) return
-    }
-    onDelete(id)
-  }, [notes, onDelete])
 
   const handleSortChange = useCallback((config: SortConfig) => {
     setSortConfig(config)
     localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(config))
   }, [])
 
-  const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    e.target.value = ''
-    const image = await onUploadImage(file)
-    if (image) {
-      await navigator.clipboard.writeText(`![[${image.filename}]]`)
-      setCopiedImage(true)
-      setTimeout(() => setCopiedImage(false), 2000)
-    }
-  }, [onUploadImage])
-
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
-  const tree = buildTree(notes, sortConfig)
-  const visibleIds = flattenVisible(tree, expanded).map(n => n.id)
-
-  const onDragStart = ({ active }: DragStartEvent) => {
-    setDraggingId(active.id as string)
-    setInsertionPoint(null)
-  }
-
-  const onDragOver = ({ active, over }: DragOverEvent) => {
-    if (!over) {
-      if (overFolderTimer.current) { clearTimeout(overFolderTimer.current); overFolderTimer.current = null }
-      setDropZone(undefined); lastDropZoneRef.current = undefined
-      setInsertionPoint(null); return
-    }
-    const overId = over.id as string
-    const overNote = notes.find(n => n.id === overId)
-
-    if (overNote?.isFolder) {
-      // Hovering a folder: drop inside it, no insertion line
-      setInsertionPoint(null)
-      const newZone = overNote.id
-      if (newZone !== lastDropZoneRef.current) {
-        if (overFolderTimer.current) { clearTimeout(overFolderTimer.current); overFolderTimer.current = null }
-        setDropZone(newZone); lastDropZoneRef.current = newZone
-        if (!expanded.has(newZone)) {
-          overFolderTimer.current = setTimeout(() => {
-            setExpanded(prev => new Set([...prev, newZone]))
-            overFolderTimer.current = null
-          }, 600)
-        }
-      }
-    } else {
-      // Hovering a note: show insertion line based on cursor position
-      const translated = active.rect.current.translated
-      if (translated) {
-        const activeCenter = translated.top + translated.height / 2
-        const overCenter = over.rect.top + over.rect.height / 2
-        const position: 'before' | 'after' = activeCenter < overCenter ? 'before' : 'after'
-        setInsertionPoint(prev =>
-          prev?.id === overId && prev.position === position ? prev : { id: overId, position }
-        )
-      }
-      // Track parent context for folder auto-expand
-      const parentZone = overNote?.parentId ?? null
-      if (parentZone !== lastDropZoneRef.current) {
-        if (overFolderTimer.current) { clearTimeout(overFolderTimer.current); overFolderTimer.current = null }
-        setDropZone(parentZone); lastDropZoneRef.current = parentZone
-      }
-    }
-  }
-
-  const onDragEnd = ({ active, over }: DragEndEvent) => {
-    const ip = insertionPoint
-    setDraggingId(null); setDropZone(undefined); lastDropZoneRef.current = undefined
-    setInsertionPoint(null)
-    if (overFolderTimer.current) { clearTimeout(overFolderTimer.current); overFolderTimer.current = null }
-    if (!over || active.id === over.id) return
-
-    const draggedId = active.id as string
-    const dragged = notes.find(n => n.id === draggedId)
-    if (!dragged) return
-
-    const overNote = notes.find(n => n.id === (over.id as string))
-    let targetParentId: string | null
-    let targetSortOrder: number | undefined
-
-    if (overNote?.isFolder) {
-      // Dropped into folder — place at end
-      targetParentId = overNote.id
-    } else if (ip) {
-      // Dropped via insertion line
-      const anchor = notes.find(n => n.id === ip.id)
-      targetParentId = anchor?.parentId ?? null
-      // Compute sort order between neighbors
-      const siblings = notes
-        .filter(n => (n.parentId ?? null) === targetParentId && n.id !== draggedId)
-        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-      const idx = siblings.findIndex(n => n.id === ip.id)
-      if (idx !== -1) {
-        if (ip.position === 'before') {
-          const prev = siblings[idx - 1]
-          const curr = siblings[idx]
-          targetSortOrder = prev ? (prev.sortOrder + curr.sortOrder) / 2 : curr.sortOrder - 500
-        } else {
-          const curr = siblings[idx]
-          const next = siblings[idx + 1]
-          targetSortOrder = next ? (curr.sortOrder + next.sortOrder) / 2 : curr.sortOrder + 500
-        }
-      }
-    } else {
-      targetParentId = computeDropZone(over.id as string, notes)
-    }
-
-    // Cycle check for folder moves
-    if (dragged.isFolder && targetParentId !== null) {
-      const desc = new Set<string>()
-      const collectDesc = (id: string) => { for (const n of notes) { if (n.parentId === id) { desc.add(n.id); collectDesc(n.id) } } }
-      collectDesc(draggedId)
-      if (desc.has(targetParentId)) return
-    }
-
-    if ((dragged.parentId ?? null) === targetParentId && targetSortOrder === undefined) return
-    onMove(draggedId, targetParentId, targetSortOrder)
-  }
-
-  const draggingNote = draggingId ? notes.find(n => n.id === draggingId) : null
-
-  const insertLine = <div className="h-0.5 bg-primary mx-1 my-px rounded-full pointer-events-none" />
-
-  const renderNode = (node: NoteNode): React.ReactNode => {
-    const isExpanded = expanded.has(node.id)
-    const isFolderTarget = dropZone === node.id && node.isFolder
-    const insertBefore = insertionPoint?.id === node.id && insertionPoint.position === 'before'
-    const insertAfter = insertionPoint?.id === node.id && insertionPoint.position === 'after'
-
-    const item = (
-      <SidebarItem
-        key={node.id}
-        note={node}
-        depth={node.depth}
-        isActive={node.id === activeId}
-        isExpanded={isExpanded}
-        canEdit={canEdit}
-        onSelect={onSelect}
-        onToggle={toggle}
-        onRename={onRename}
-        onDelete={handleDelete}
-        onNewNote={onNewNote}
-        onNewFolder={onNewFolder}
-        childCount={countDescendants(notes, node.id)}
-      />
-    )
-
-    if (!node.isFolder) {
-      return (
-        <React.Fragment key={node.id}>
-          {insertBefore && insertLine}
-          {item}
-          {insertAfter && insertLine}
-        </React.Fragment>
-      )
-    }
-
-    return (
-      <div
-        key={`zone-${node.id}`}
-        className={`rounded-md transition-colors ${isFolderTarget ? 'bg-primary/10 ring-1 ring-inset ring-primary/20' : ''}`}
-      >
-        {insertBefore && insertLine}
-        {item}
-        {isExpanded && node.children.map(child => renderNode(child))}
-      </div>
-    )
-  }
-
   return (
     <aside className="p-2 text-foreground flex-1 overflow-y-auto min-h-0">
-      {/* Notes header row */}
-      <div className="flex items-center mb-2 px-1">
-        <span className="font-bold text-[13px] text-muted-foreground flex-1">Notes</span>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className="bg-transparent border-none text-muted-foreground cursor-pointer text-sm px-1 py-px leading-none hover:text-foreground"
-              title="Sort notes"
-              aria-label="Sort notes"
-            >
-              ⇅
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuLabel className="text-xs text-muted-foreground tracking-wide">SORT BY</DropdownMenuLabel>
-            {SORT_FIELDS.map(({ field, label }) => (
-              <DropdownMenuItem
-                key={field}
-                onClick={() => handleSortChange({
-                  by: field,
-                  direction: sortConfig.by === field
-                    ? (sortConfig.direction === 'asc' ? 'desc' : 'asc')
-                    : 'asc',
-                })}
-                className="flex items-center gap-2 text-[13px]"
-              >
-                <span className="w-3 text-primary text-[10px]">{sortConfig.by === field ? '●' : '○'}</span>
-                <span className="flex-1">{label}</span>
-                {sortConfig.by === field && (
-                  <span className="text-muted-foreground text-[11px]">
-                    {sortConfig.direction === 'asc' ? '↑' : '↓'}
-                  </span>
-                )}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* Action buttons */}
-      {canEdit && (
-        <>
-          <div className="flex gap-1 mb-2">
-            {/* New dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-1 flex-1 py-0.5 px-2 bg-card text-foreground border-none rounded cursor-pointer text-[11px] hover:bg-card/80 justify-center">
-                  + New <ChevronDown className="w-3 h-3 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => onNewNote(null)}>Note</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onNewFolder(null)}>Folder</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Import dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-1 flex-1 py-0.5 px-2 bg-card text-foreground border-none rounded cursor-pointer text-[11px] hover:bg-card/80 justify-center">
-                  Import <ChevronDown className="w-3 h-3 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => imageInputRef.current?.click()}>Image</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => notesInputRef.current?.click()}>Markdown files</DropdownMenuItem>
-                <DropdownMenuItem onClick={async () => {
-                  let source: FileSystemDirectoryHandle | FileList | null = null
-                  if ('showDirectoryPicker' in window) {
-                    try { source = await (window as any).showDirectoryPicker({ mode: 'read' }) }
-                    catch { return }
-                  } else {
-                    folderInputRef.current?.click()
-                    return
-                  }
-                  if (!source) return
-                  const result = await onImportVault(source)
-                  setVaultImportResult(result)
-                  setTimeout(() => setVaultImportResult(null), 4000)
-                }}>Folder</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {/* Feedback */}
-          {copiedImage && <p className="text-[11px] text-ctp-green mb-1 px-1">Image copied to clipboard!</p>}
-          {importedCount !== null && <p className="text-[11px] text-ctp-green mb-1 px-1">Imported {importedCount} note{importedCount !== 1 ? 's' : ''}!</p>}
-          {vaultImportResult !== null && (
-            <p className="text-[11px] text-ctp-green mb-1 px-1">
-              Imported {vaultImportResult.notes} note{vaultImportResult.notes !== 1 ? 's' : ''}
-              {vaultImportResult.images > 0 ? ` + ${vaultImportResult.images} image${vaultImportResult.images !== 1 ? 's' : ''}` : ''}!
-            </p>
-          )}
-
-          <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-          <input
-            ref={notesInputRef}
-            type="file"
-            accept=".md,.markdown"
-            multiple
-            className="hidden"
-            onChange={async e => {
-              if (!e.target.files?.length) return
-              const count = await onImportNotes(e.target.files)
-              e.target.value = ''
-              setImportedCount(count)
-              setTimeout(() => setImportedCount(null), 3000)
-            }}
-          />
-          <input
-            ref={folderInputRef}
-            type="file"
-            multiple
-            className="hidden"
-            // @ts-expect-error webkitdirectory not in React types
-            webkitdirectory="true"
-            onChange={async e => {
-              if (!e.target.files?.length) return
-              const result = await onImportVault(e.target.files)
-              e.target.value = ''
-              setVaultImportResult(result)
-              setTimeout(() => setVaultImportResult(null), 4000)
-            }}
-          />
-        </>
-      )}
-
-      {/* Note tree */}
-      <DndContext sensors={sensors} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
-        <SortableContext items={visibleIds}>
-          {tree.map(node => renderNode(node))}
-        </SortableContext>
-        <DragOverlay>
-          {draggingNote && (
-            <div className="px-2 py-1 rounded bg-card text-foreground text-[13px] opacity-90 border border-[#45475a]">
-              {draggingNote.title}
-            </div>
-          )}
-        </DragOverlay>
-      </DndContext>
-
-      {/* Images section */}
-      {images.length > 0 && (
-        <div className="mt-3">
-          <div className="px-1 mb-1">
-            <span className="font-bold text-[13px] text-muted-foreground">Images</span>
-          </div>
-          {images.map(img => {
-            const isRenaming = renamingImageId === img.id
-            const startRename = () => {
-              imageRenameActiveRef.current = true
-              setImageRenameValue(img.filename)
-              setRenamingImageId(img.id)
-              setTimeout(() => imageRenameInputRef.current?.select(), 10)
-            }
-            return (
-              <ContextMenu key={img.id}>
-                <ContextMenuTrigger asChild>
-                  <div
-                    onClick={() => { if (!isRenaming) onSelectImage(img) }}
-                    className={`flex items-center gap-1 px-2 py-1 rounded cursor-pointer text-[13px] text-foreground overflow-hidden ${selectedImageId === img.id ? 'bg-card' : 'hover:bg-card/50'}`}
-                    title={img.filename}
-                  >
-                    <ImageIcon className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                    {isRenaming ? (
-                      <input
-                        ref={imageRenameInputRef}
-                        value={imageRenameValue}
-                        onChange={e => setImageRenameValue(e.target.value)}
-                        onBlur={() => {
-                          if (!imageRenameActiveRef.current) return
-                          imageRenameActiveRef.current = false
-                          const trimmed = imageRenameValue.trim()
-                          if (trimmed && trimmed !== img.filename) onRenameImage(img.id, trimmed)
-                          setRenamingImageId(null)
-                        }}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            imageRenameInputRef.current?.blur()
-                          }
-                          if (e.key === 'Escape') {
-                            imageRenameActiveRef.current = false
-                            setRenamingImageId(null)
-                          }
-                        }}
-                        onClick={e => e.stopPropagation()}
-                        autoFocus
-                        className="flex-1 bg-card border border-primary rounded-sm text-foreground text-[13px] px-1 py-px focus:outline-none"
-                      />
-                    ) : (
-                      <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{img.filename}</span>
-                    )}
-                  </div>
-                </ContextMenuTrigger>
-                {canEdit && (
-                  <ContextMenuContent>
-                    <ContextMenuItem onClick={startRename}>Rename</ContextMenuItem>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem
-                      onClick={() => onDeleteImage(img.id)}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      Delete
-                    </ContextMenuItem>
-                  </ContextMenuContent>
-                )}
-              </ContextMenu>
-            )
-          })}
-        </div>
-      )}
+      <SidebarHeader
+        canEdit={canEdit}
+        sortConfig={sortConfig}
+        onSortChange={handleSortChange}
+        onNewNote={onNewNote}
+        onNewFolder={onNewFolder}
+        onUploadImage={onUploadImage}
+        onImportNotes={onImportNotes}
+        onImportVault={onImportVault}
+      />
+      <SidebarFileTree
+        notes={notes}
+        activeId={activeId}
+        canEdit={canEdit}
+        sortConfig={sortConfig}
+        onSelect={onSelect}
+        onRename={onRename}
+        onDelete={onDelete}
+        onNewNote={onNewNote}
+        onNewFolder={onNewFolder}
+        onMove={onMove}
+      />
+      <SidebarImages
+        images={images}
+        selectedImageId={selectedImageId}
+        canEdit={canEdit}
+        onSelectImage={onSelectImage}
+        onRenameImage={onRenameImage}
+        onDeleteImage={onDeleteImage}
+      />
     </aside>
   )
 }
